@@ -24,7 +24,7 @@ class CoevalMaps_LIM:
 
         zlist = LIM_coefficients.zintegral 
         _iz = min(range(len(zlist)), key=lambda i: np.abs(zlist[i]-z)) #pick closest z
-        self.rhoL_avg = LIM_coefficients.rhoL_avg[_iz]
+        self.Inu_global = LIM_coefficients.Inu_avg[_iz]
         self.Nbox = Nbox
         self.Lbox = Lbox
         self.seed = seed
@@ -37,7 +37,7 @@ class CoevalMaps_LIM:
                 
             PLIM = Power_Spectrum_LIM.Deltasq_LIM_lin[_iz]/k3over2pi2
 
-            PLIMnorminterp = interp1d(klist,PLIM/self.rhoL_avg**2,fill_value=0.0,bounds_error=False)
+            PLIMnorminterp = interp1d(klist,PLIM/self.Inu_global**2,fill_value=0.0,bounds_error=False)
 
             pb = pbox.PowerBox(
                 N=self.Nbox,                     
@@ -47,6 +47,6 @@ class CoevalMaps_LIM:
                 seed = self.seed                
             )
 
-            self.LIMmap = self.rhoL_avg * (1 + pb.delta_x() )
+            self.LIMmap = self.Inu_global * (1 + pb.delta_x() )
             self.deltamap = None
 
