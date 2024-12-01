@@ -6,7 +6,7 @@ Author: Sarah Libanore
 BGU - November 2024
 
 """
-
+from copy import copy
 from .correlations import * 
 
 class Correlations_LIM:
@@ -103,13 +103,7 @@ class Power_Spectra_LIM:
         # for the moment we only work with LIM power spectrum, we will then add the cross
 
         # LIM case
-        _dummy_kwindow_LIM, self.window_LIM = self.get_LIM_window(Cosmo_Parameters, Correlations, LIM_coefficients)
-
-        #calculate some growth etc, and the bubble biases for the xHI linear window function:
-        self._lingrowthd = cosmology.growth(Cosmo_Parameters, LIM_coefficients.zintegral)
-
-        # get all non linear correlation function 
-        self.get_all_corrs_LIM(Cosmo_Parameters, Correlations, LIM_coefficients)
+        self.window_LIM = self.get_LIM_window(Cosmo_Parameters, Correlations, LIM_coefficients)
 
         self._k3over2pi2 = (self.klist_PS**3)/(2.0 * np.pi**2)
 
@@ -119,11 +113,32 @@ class Power_Spectra_LIM:
 
         self.Deltasq_LIM_lin = self._Pk_LIM_lin * self._k3over2pi2 
 
-        #nonlinear corrections too:
-        # ????? 
-        #self._d_Pk_LIM_nl = self.get_list_PS(self._deltaxi_LIM,  LIM_coefficients.zintegral) 
+        # get all non linear correlation function 
+        self.get_all_corrs_LIM(Line_Parameters, Cosmo_Parameters, Correlations, LIM_coefficients)
 
-        #self.Deltasq_LIM = self.Deltasq_LIM_lin + self._d_Pk_LIM_nl * self._k3over2pi2 
+        #nonlinear corrections too:
+        if Line_Parameters._R < constants.MAX_R_NONLINEAR:   
+            self._d_Pk_LIM_nl = self.get_list_PS(self._deltaxi_LIM,  LIM_coefficients.zintegral) 
+        else:
+            self._d_Pk_LIM_nl = 0.
+
+        self.Deltasq_LIM = self.Deltasq_LIM_lin + self._d_Pk_LIM_nl * self._k3over2pi2 
+
+       #calculate some growth 
+        self._lingrowthd = cosmology.growth(Cosmo_Parameters, LIM_coefficients.zintegral)
+
+        # cross correlation with the density
+        self._Pk_dLIM_lin = (self.window_LIM.T * self._lingrowthd).T * Correlations._PklinCF
+        
+        self._Pk_dLIM =  self._Pk_dLIM_lin
+
+        if(constants.FLAG_DO_DENS_NL) and Line_Parameters._R < constants.MAX_R_NONLINEAR:  #note that the nonlinear terms (cross and auto) below here have the growth already accounted for
+
+            self._d_Pk_dLIM_nl = self.get_list_PS(self._deltaxi_dLIM, LIM_coefficients.zintegral)
+            self._Pk_dLIM += self._d_Pk_dLIM_nl
+
+        self.Deltasq_dLIM_lin = self._Pk_dLIM_lin * self._k3over2pi2 
+        self.Deltasq_dLIM = self._Pk_dLIM * self._k3over2pi2 
 
         # in the correlations.py file, there are xa, Tk , deltaNL, xion and their cross correlations
 
@@ -133,6 +148,7 @@ class Power_Spectra_LIM:
     def get_LIM_window(self, Cosmo_Parameters, Correlations, LIM_coefficients): 
         "Returns the LIM window function for all z in zintegral"
         
+        # in the LIM case, we do NOT need to fourier transform this combination of coefficients, since they are not dependent on R, but they are simply constants 
         zGreaterMatrix100 = np.copy(LIM_coefficients.zGreaterMatrix)
         zGreaterMatrix100[np.isnan(zGreaterMatrix100)] = 100
 
@@ -142,31 +158,15 @@ class Power_Spectra_LIM:
 
         coeffRmatrix = LIM_coefficients.coeff2_LIM # only 1 R due to resolution 
         gammaRmatrix = LIM_coefficients.gammaLIM_index * growthRmatrix # only 1 R due to resolution 
-
+        
         _wincoeffsMatrix_z = coeffRmatrix * gammaRmatrix # only 1 R due to resolution - it is a Nz x 1 matrix 
         
-        if(Cosmo_Parameters.Flag_emulate_21cmfast==False): #do the standard 1D TopHat
-
-            # ??? this scaling related to the R in the correlation function (array), in the integral of the FFT 
-            _wincoeffsMatrix = _wincoeffsMatrix_z / (4*np.pi * Cosmo_Parameters._Rtabsmoo**2) * (Cosmo_Parameters._Rtabsmoo * Cosmo_Parameters._dlogRR) 
-
-            # here we use array of R since this is where the correlation function is computed
-            _kwinLIM, _win_LIM = self.get_Pk_from_xi(Cosmo_Parameters._Rtabsmoo, _wincoeffsMatrix)
-
-        else:
-            _kwinLIM = self.klist_PS
-
-            coeffRgammaRmatrix = coeffRmatrix * gammaRmatrix
-            coeffRgammaRmatrix = coeffRgammaRmatrix.reshape(*coeffRgammaRmatrix.shape, 1)
-
-            dummyMesh, RLIMMesh, kWinLIMMesh = np.meshgrid(LIM_coefficients.zintegral, LIM_coefficients._R, _kwinLIM, indexing = 'ij', sparse = True)
-
-            _win_LIM = coeffRgammaRmatrix * Correlations._WinTH(RLIMMesh, _kwinLIM)
-            _win_LIM = np.sum(_win_LIM, axis = 1)
+        _wincoeffsMatrix = _wincoeffsMatrix_z          
+        _win_LIM = _wincoeffsMatrix
 
         _win_LIM *= np.array([coeffzpLIM]).T
 
-        return _kwinLIM, _win_LIM
+        return _win_LIM
 
     # same from correlations.py 
     def get_Pk_from_xi(self, rsinput, xiinput):
@@ -177,18 +177,28 @@ class Power_Spectra_LIM:
         return kPf, Pf
 
 
-    def get_all_corrs_LIM(self, Cosmo_Parameters, Correlations, LIM_coefficients):
+    def get_all_corrs_LIM(self, Line_Parameters, Cosmo_Parameters, Correlations, LIM_coefficients):
         "Returns the LIM components of the correlation functions of all observables at each z in zintegral"
 
         zGreaterMatrix100 = np.copy(LIM_coefficients.zGreaterMatrix)
         zGreaterMatrix100[np.isnan(zGreaterMatrix100)] = 100
 
-        # ?????? 
-        _iRnonlinear = [-1] #np.arange(Cosmo_Parameters.indexmaxNL)
-        #corrdNL = Correlations.xi_LIMLIM_CF[np.ix_(_iRnonlinear,_iRnonlinear)]
-        #for R<RNL fix at RNL, avoids corelations blowing up at low R
-        #corrdNL[0:Cosmo_Parameters.indexminNL,0:Cosmo_Parameters.indexminNL] = corrdNL[Cosmo_Parameters.indexminNL,Cosmo_Parameters.indexminNL]
-        #corrdNL = corrdNL.reshape((1, *corrdNL.shape))
+        # corrdNL is the correlation xi^R0R0*(k,z) = FT(P(k)W^R0(k))^2) 
+        # np._ix indexes its first and second dimension i.e. the Rs one!
+        # hence for us it just becomes a flag
+        if Line_Parameters._R < constants.MAX_R_NONLINEAR:
+            
+            _iRnonlinear = [-1] 
+            corrdNL = Correlations.xi_LIMLIM_CF[np.ix_(_iRnonlinear,_iRnonlinear)]
+            #for R<RNL fix at RNL, avoids corelations blowing up at low R
+            if Line_Parameters._R < constants.MIN_R_NONLINEAR:
+                print('Your resolution introduces too large non linear corrections on small scales! ')
+                print('It should have been changed in the input file, check why this did not happened')
+
+            corrdNL = corrdNL.reshape((1, *corrdNL.shape))
+        else:
+            _iRnonlinear = [-1] 
+            print('The resolution allows for fully linear calculation')
 
         growthRmatrix = cosmology.growth(Cosmo_Parameters,zGreaterMatrix100[:, _iRnonlinear])
         gammaR1 = LIM_coefficients.gammaLIM_index[:, _iRnonlinear] * growthRmatrix
@@ -199,26 +209,27 @@ class Power_Spectra_LIM:
 
         coeffmatrix_LIM = coeffR1_LIM.reshape(len(LIM_coefficients.zintegral), 1, len(_iRnonlinear),1) * coeffR1_LIM.reshape(len(LIM_coefficients.zintegral), len(_iRnonlinear), 1,1)
 
-        gammamatrixR1R1 = gammaR1.reshape(len(LIM_coefficients.zintegral), 1, len(_iRnonlinear),1) * gammaR1.reshape(len(LIM_coefficients.zintegral), len(_iRnonlinear), 1,1)
+        if Line_Parameters._R < constants.MAX_R_NONLINEAR:
+            gammamatrixR1R1 = gammaR1.reshape(len(LIM_coefficients.zintegral), 1, len(_iRnonlinear),1) * gammaR1.reshape(len(LIM_coefficients.zintegral), len(_iRnonlinear), 1,1)
 
-        #gammaTimesCorrdNL = ne.evaluate('gammamatrixR1R1 * corrdNL')#np.einsum('ijkl,ijkl->ijkl', gammamatrixR1R1, corrdNL, optimize = True) #same thing as gammamatrixR1R1 * corrdNL but faster
-        #expGammaCorrMinusLinear = ne.evaluate('exp(gammaTimesCorrdNL) - 1 - gammaTimesCorrdNL')
-        # self._II_deltaxi_xa = np.einsum('ijkl->il', coeffmatrixxa * expGammaCorrMinusLinear, optimize = True)
-        # self._II_deltaxi_xa *= np.array([coeffzp1xa]).T**2 #brings it to xa units
+            gammaTimesCorrdNL = ne.evaluate('gammamatrixR1R1 * corrdNL')#np.einsum('ijkl,ijkl->ijkl', gammamatrixR1R1, corrdNL, optimize = True) #same thing as gammamatrixR1R1 * corrdNL but faster
+            expGammaCorrMinusLinear = ne.evaluate('exp(gammaTimesCorrdNL) - 1 - gammaTimesCorrdNL')
 
-        # ???? 
-        expGammaCorrMinusLinear = ne.evaluate('exp(gammamatrixR1R1) - 1 - gammamatrixR1R1')
-        self._deltaxi_LIM = np.einsum('ijkl->il', coeffmatrix_LIM * expGammaCorrMinusLinear, optimize = True)
-        self._deltaxi_LIM *= np.array([coeffzp1_LIM]).T**2 #brings it to xa units
+            self._deltaxi_LIM = np.einsum('ijkl->il', coeffmatrix_LIM * expGammaCorrMinusLinear, optimize = True)
+            self._deltaxi_LIM *= np.array([coeffzp1_LIM]).T**2 #brings it to Inu units
 
-        # ???
-        # if (constants.FLAG_DO_DENS_NL):
-        #     D_growthRmatrix = growthRmatrix[:,:1].reshape(*growthRmatrix[:,:1].shape, 1)
+        if (constants.FLAG_DO_DENS_NL) and Line_Parameters._R < constants.MAX_R_NONLINEAR:
+
+            D_coeffR1LIM = coeffR1_LIM.reshape(*coeffR1_LIM.shape, 1)
+            D_gammaR1 = gammaR1.reshape(*gammaR1.shape , 1)
+            D_growthRmatrix = growthRmatrix[:,:1].reshape(*growthRmatrix[:,:1].shape, 1)
+            D_corrdNL = corrdNL[:1,0,:,:]
+
+            self._deltaxi_dLIM = np.sum(D_coeffR1LIM * ((np.exp(D_gammaR1 * D_growthRmatrix * D_corrdNL )-1.0 ) - D_gammaR1 * D_growthRmatrix * D_corrdNL), axis = 1)
+
+            self._deltaxi_dLIM *= np.array([coeffzp1_LIM]).T
             
-        #     D_corrdNL = corrdNL[:1,0,:,:]
-
-        #     self._II_deltaxi_d = (np.exp(growthRmatrix[:,:1]**2 * corrdNL[0,0,0,:]) - 1.0) - growthRmatrix[:,:1]**2 * corrdNL[0,0,0,:]
-
+            
         return 1
 
 

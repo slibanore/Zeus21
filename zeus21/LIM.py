@@ -44,7 +44,7 @@ class get_LIM_coefficients:
 
         # !!! SL: check the dimensions, but they should be correct 
         #define table of redshifts and distances
-        self.rGreaterMatrix = np.transpose([Cosmo_Parameters.chiofzint(self.zintegral)]) + self.Rtabsmoo_LIM
+        self.rGreaterMatrix = np.transpose([Cosmo_Parameters.chiofzint(self.zintegral)]) #+ self.Rtabsmoo_LIM !!! 
         self.zGreaterMatrix = Cosmo_Parameters.zfofRint(self.rGreaterMatrix)
         
         self.ztabRsmoo = np.nan_to_num(np.copy(self.zGreaterMatrix), nan = 100)
@@ -119,7 +119,8 @@ class get_LIM_coefficients:
 
         # !!! SL: we keep R dimension in case we want to have more values e.g. z dependnet
         rGreaterArray[Cosmo_Parameters.chiofzint(zArray_LIM) + rArray_LIM >= Cosmo_Parameters.chiofzint(50)] = np.nan
-        zGreaterArray = Cosmo_Parameters.zfofRint(Cosmo_Parameters.chiofzint(zArray_LIM) + rGreaterArray) 
+
+        zGreaterArray = Cosmo_Parameters.zfofRint(Cosmo_Parameters.chiofzint(zArray_LIM) )#+ rGreaterArray) 
 
         whereNotNans = np.invert(np.isnan(rGreaterArray))
 

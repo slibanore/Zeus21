@@ -38,7 +38,14 @@ class Line_Parameters:
         
         self.LINE = LineParams_Input.LINE # which line to use 
         self.OBSERVABLE_LIM = LineParams_Input.OBSERVABLE_LIM
-        self._R = LineParams_Input._R # resolution in Mpc, default same value as Cosmo_Params.Rsmmin. Should be set by the point where the exponential approximation breaks (?)
+                
+        # resolution in Mpc, default same value as Cosmo_Params.Rsmmin. Should be set by the point where the exponential approximation breaks (?)                   
+        if LineParams_Input._R < 0.5:
+            print('Your resolution introduces too large non linear corrections on small scales! ')
+            print('We use instead MIN_R_NONLINEAR = 0.5 Mpc')
+            self._R = 0.5
+        else:
+            self._R = LineParams_Input._R 
 
         self.CII_MODEL = LineParams_Input.CII_MODEL 
         self.CII_nu_rest = LineParams_Input.CII_nu_rest # rest frame frequency in Hz (= 158 um)
