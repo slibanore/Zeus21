@@ -92,7 +92,7 @@ class Correlations_LIM:
 class Power_Spectra_LIM:
     "Get power spetrum from correlation functions and coefficients"
 
-    def __init__(self, Cosmo_Parameters, Astro_Parameters, Line_Parameters, Correlations, T21_coefficients, LIM_coefficients, RSD_MODE=1):
+    def __init__(self, Cosmo_Parameters, Astro_Parameters, Line_Parameters, Correlations, T21_coeff, LIM_coefficients, RSD_MODE=1):
 
 #        print("STEP 0: Variable Setup")
         #set up some variables following correlations.py
@@ -144,6 +144,7 @@ class Power_Spectra_LIM:
 
         # finally, step 2 in the correlation file gets the 21cm power spectrum 
 
+        # getting cross correlation with T21
 
     def get_LIM_window(self, Cosmo_Parameters, Correlations, LIM_coefficients): 
         "Returns the LIM window function for all z in zintegral"
@@ -193,7 +194,7 @@ class Power_Spectra_LIM:
             #for R<RNL fix at RNL, avoids corelations blowing up at low R
             if Line_Parameters._R < constants.MIN_R_NONLINEAR:
                 print('Your resolution introduces too large non linear corrections on small scales! ')
-                print('It should have been changed in the input file, check why this did not happened')
+                print('It should have been changed in the input file, check why this did not happened\n')
 
             corrdNL = corrdNL.reshape((1, *corrdNL.shape))
         else:

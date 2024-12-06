@@ -40,10 +40,10 @@ class Line_Parameters:
         self.OBSERVABLE_LIM = LineParams_Input.OBSERVABLE_LIM
                 
         # resolution in Mpc, default same value as Cosmo_Params.Rsmmin. Should be set by the point where the exponential approximation breaks (?)                   
-        if LineParams_Input._R < 0.5:
+        if LineParams_Input._R < 2.:
             print('Your resolution introduces too large non linear corrections on small scales! ')
-            print('We use instead MIN_R_NONLINEAR = 0.5 Mpc')
-            self._R = 0.5
+            print('We use instead MIN_R_NONLINEAR = 2 Mpc')
+            self._R = 2.
         else:
             self._R = LineParams_Input._R 
 

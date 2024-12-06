@@ -225,17 +225,11 @@ class get_LIM_coefficients:
 
         if(SZ.constants.C2_RENORMALIZATION_FLAG==True):
 
-            if self.Rtabsmoo_LIM > SZ.constants.MIN_R_NONLINEAR:
+            if self.Rtabsmoo_LIM >= SZ.constants.MIN_R_NONLINEAR and self.Rtabsmoo_LIM < SZ.constants.MAX_R_NONLINEAR:
                 _corrfactorEulerian_LIM = 1.0 + (self.gammaLIM_index-1.0)*self.sigmaofRtab_LIM**2
 
-            else:
-                #for R<R_NL we just fix it to the RNL value, as we do for the correlation function. We could cut the sum but this keeps those scales albeit approximately
+                self.coeff2_LIM *= _corrfactorEulerian_LIM
 
-                sigmaofRtab_LIM_NL = np.array([HMF_interpolator.sigmaR_int([SZ.constants.MIN_R_NONLINEAR], zz) for zz in self.zintegral])
-
-                _corrfactorEulerian_LIM = 1.0 + (self.gammaLIM_index-1.0)*sigmaofRtab_LIM_NL**2
-
-            _corrfactorEulerian_LIM=_corrfactorEulerian_LIM.T
 
 
 
@@ -255,7 +249,8 @@ def rhoL_integrand(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_inte
     Mh = massVector # in Msun
     
     HMF_curr = np.exp(HMF_interpolator.logHMFint((np.log(Mh), z))) # in Mpc-3 Msun-1 
-    Ltab_curr = LineLuminosity(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, Mh, z) # in Lsun 
+
+    Ltab_curr = LineLuminosity(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, Mh, z) 
 
     integrand_LIM = HMF_curr * Ltab_curr * Mh # in Lsun / Mpc3 
 
@@ -285,9 +280,26 @@ def LineLuminosity(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_inte
                 if alpha_SFR < 0.:
                     alpha_SFR = 0.
 
-            log10_L = alpha_SFR * np.log10(SFR) + beta_SFR            
-            output = 10.**log10_L
+            log10_L = alpha_SFR * np.log10(SFR) + beta_SFR     
 
+            if Line_Parameters.CII_sigma_LSFR == 0.:
+                output = 10.**log10_L
+            else:
+                LSFR_mean = 10.**log10_L
+                
+                sigma = Line_Parameters.CII_sigma_LSFR * 2.302585
+                mu = lambda meanLSFR: np.log(meanLSFR) - (sigma**2)/2
+
+                Lval = lambda meanLSFR: np.linspace(meanLSFR-10*Line_Parameters.CII_sigma_LSFR, meanLSFR+10*Line_Parameters.CII_sigma_LSFR, 1000)
+
+                lognormal_nan = lambda meanLSFR: (1/(np.sqrt(2*np.pi)*sigma*Lval(meanLSFR)))*np.exp(- (np.log(Lval(meanLSFR))-mu(meanLSFR))/(2*sigma**2))
+
+                lognormal = lambda meanLSFR: np.where(np.isnan(lognormal_nan(meanLSFR)), 0, lognormal_nan(meanLSFR))
+
+                output_funct = lambda meanLM: np.trapz(lognormal(meanLM), Lval(meanLM))
+
+                output = np.vectorize(output_funct)(LSFR_mean)
+                
     else:
         output = -1
 
