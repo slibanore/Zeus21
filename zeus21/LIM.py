@@ -292,7 +292,7 @@ def LineLuminosity(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_inte
 
                 Lval = lambda meanLSFR: np.linspace(meanLSFR-10*Line_Parameters.CII_sigma_LSFR, meanLSFR+10*Line_Parameters.CII_sigma_LSFR, 1000)
 
-                lognormal_nan = lambda meanLSFR: (1/(np.sqrt(2*np.pi)*sigma*Lval(meanLSFR)))*np.exp(- (np.log(Lval(meanLSFR))-mu(meanLSFR))/(2*sigma**2))
+                lognormal_nan = lambda meanLSFR: (1/(np.sqrt(2*np.pi)*sigma*Lval(meanLSFR)))*np.exp(- (np.log(Lval(meanLSFR))-mu(meanLSFR))**2/(2*sigma**2))
 
                 lognormal = lambda meanLSFR: np.where(np.isnan(lognormal_nan(meanLSFR)), 0, lognormal_nan(meanLSFR))
 
