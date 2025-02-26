@@ -767,7 +767,61 @@ def SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 
     fstarM = fstarofz(Astro_Parameters, Cosmo_Parameters, z, Mh)
     fstarM = np.fmin(fstarM, Astro_Parameters.fstarmax)
     
-    return dMh_dt(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, Mh, z)  * fstarM * fduty
+    # Sarah Libanore: add stochasticity in the SFR-M* and M*-Mh relations
+
+    SFR_det = dMh_dt(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, Mh, z)  * fstarM * fduty
+
+    if not Astro_Parameters.STOCHASTICITY:
+        # this is the original output of the code 
+        return SFR_det
+    else:
+
+        if len(np.shape(SFR_det)) == 2:
+            SFR = SFR_det[:,np.newaxis,:]
+        elif len(np.shape(SFR_det)) == 4:
+            SFR = SFR_det[:,:,:,:,np.newaxis]
+
+        # values see fig 2 in 2406.15237
+        M = np.logspace(5,10,147)
+        #SFR_values = np.logspace(np.log10(np.min(SFR[SFR > 1e-10])),np.log10(np.max(SFR)),151)
+        SFR_values = np.logspace(-5,2,151)
+        
+        sigma_M = 0.25
+
+        SFR_marginalized_SFR  = [] 
+        mu_M  = []
+        p_MMh  = [] 
+
+        debug = []
+        
+        for i in range(len(M)):
+            mu_SFR = np.log(M[i]) - np.log(0.43 * cosmology.Hubinvyr(Cosmo_Parameters,z))
+
+            sigma_SFR = -0.12*np.log(M[i]) + 1.35 if np.log(M[i]) < 10. else 0.19
+            # p_z(SFR|M_*) from 2406.15237
+            if len(np.shape(SFR_det)) == 2:
+                p_SFRM = (1./(SFR_values*sigma_SFR*np.sqrt(2*np.pi)) * np.exp(-(np.log(SFR_values)-mu_SFR)**2/2./sigma_SFR**2))[:,:,np.newaxis]
+                integrate_axis = 1
+            elif len(np.shape(SFR_det)) == 4:
+                p_SFRM = (1./(SFR_values*sigma_SFR*np.sqrt(2*np.pi)) * np.exp(-(np.log(SFR_values)-mu_SFR)**2/2./sigma_SFR**2))[:,:,np.newaxis,:]
+                integrate_axis = 4
+            
+            debug.append(np.exp(-(np.log(SFR_values)-mu_SFR)**2/2./sigma_SFR**2))
+        return debug
+
+        #     SFR_marginalized_SFR.append(np.trapz(SFR * p_SFRM, SFR_values,axis=integrate_axis))
+
+        #     mu_M.append(-1.42+np.log(Mh) -np.log((Mh/2.6e11)**-0.5+(Mh/2.6e11)**0.6))             
+        #     # p(M_*|M_h) from 2406.15237
+        #     p_MMh.append(1./(M[i]*sigma_M*np.sqrt(2*np.pi)) * np.exp(-(np.log(M[i])-mu_M[i])**2/2./sigma_M**2))
+
+        # if len(np.shape(SFR_det)) == 2:
+        #     SFR_marginalized_MSFR = np.trapz(np.asarray(SFR_marginalized_SFR) * np.asarray(p_MMh), M, axis = 0)
+        # elif len(np.shape(SFR_det)) == 4:
+        #     SFR_marginalized_MSFR = np.trapz(np.asarray(SFR_marginalized_SFR) * np.asarray(p_MMh), M, axis = 0)
+        
+        # #print(SFR_marginalized_MSFR)
+        # return SFR_marginalized_MSFR
 
 
 def SFR_III(Astro_Parameters, Cosmo_Parameters, ClassCosmo, HMF_interpolator, massVector, J21LW_interp, z, z2, vCB):

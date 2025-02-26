@@ -208,9 +208,14 @@ class Astro_Parameters:
                     A_vcb = 1.0,
                     beta_vcb = 1.8,
                  
-
+                    # Sarah Libanore: add stochasticity in the SFR-M* and M*-Mh relations
+                    STOCHASTICITY = False,
                 ):
-        
+
+
+        # Sarah Libanore: add stochasticity in the SFR-M* and M*-Mh relations
+        self.STOCHASTICITY = STOCHASTICITY
+
         #for internal functions in SED_LyA
         self.Flag_emulate_21cmfast = Cosmo_Parameters.Flag_emulate_21cmfast
 
