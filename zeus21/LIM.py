@@ -171,11 +171,11 @@ class get_LIM_coefficients:
 
         ########
         # Compute LIM quantities
-        rhoL_dR = np.trapz(integrand_LIM, HMF_interpolator.logtabMh, axis = 2)
+        self.rhoL_dR = np.trapz(integrand_LIM, HMF_interpolator.logtabMh, axis = 2)
 
         #compute gammas 
         # !!! note that it is still 2D but the dimension in R is 1 
-        self.gammaLIM_index = np.log(rhoL_dR[:,:,-1]/rhoL_dR[:,:,0]) / (deltaArray_LIM[:,:,0,-1] - deltaArray_LIM[:,:,0,0])
+        self.gammaLIM_index = np.log(self.rhoL_dR[:,:,-1]/self.rhoL_dR[:,:,0]) / (deltaArray_LIM[:,:,0,-1] - deltaArray_LIM[:,:,0,0])
         self.gammaLIM_index[np.isnan(self.gammaLIM_index)] = 0.0
 
         # ?? no velocity anisotropies and VCB effect ??
