@@ -81,6 +81,8 @@ class get_T21_coefficients:
         
         self.SFRDbar2D = np.zeros((self.Nzintegral, Cosmo_Parameters.NRs)) #SFR at z=zprime when averaged over a radius R (so up to a higher z)
         
+        self.SFRD_II_dR = np.zeros_like(self.SFRDbar2D) # Sarah Libanore: included here to use it as output                 
+
         self.gamma_index2D = np.zeros_like(self.SFRDbar2D) #index of SFR ~ exp(\gamma delta)
         self.gamma_II_index2D = np.zeros_like(self.SFRDbar2D) #index of SFR ~ exp(\gamma delta)
         self.gamma_III_index2D = np.zeros_like(self.SFRDbar2D) #index of SFR ~ exp(\gamma delta)
@@ -226,7 +228,7 @@ class get_T21_coefficients:
 
         ########
         # Compute SFRD quantities
-        SFRD_II_dR = np.trapz(integrand_II, HMF_interpolator.logtabMh, axis = 2)
+        self.SFRD_II_dR = np.trapz(integrand_II, HMF_interpolator.logtabMh, axis = 2)
 
         ###
         if Astro_Parameters.USE_POPIII == True:
@@ -237,11 +239,11 @@ class get_T21_coefficients:
 
             SFRD_III_dR = np.trapz(integrand_III, HMF_interpolator.logtabMh, axis = 2)
         else:
-            SFRD_III_dR = np.zeros_like(SFRD_II_dR)
+            SFRD_III_dR = np.zeros_like(self.SFRD_II_dR)
             
             
         #compute gammas
-        self.gamma_II_index2D = np.log(SFRD_II_dR[:,:,-1]/SFRD_II_dR[:,:,0]) / (deltaArray[:,:,0,-1] - deltaArray[:,:,0,0])
+        self.gamma_II_index2D = np.log(self.SFRD_II_dR[:,:,-1]/self.SFRD_II_dR[:,:,0]) / (deltaArray[:,:,0,-1] - deltaArray[:,:,0,0])
         self.gamma_II_index2D[np.isnan(self.gamma_II_index2D)] = 0.0
 
         if Astro_Parameters.USE_POPIII == True:
