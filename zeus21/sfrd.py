@@ -184,6 +184,7 @@ class get_T21_coefficients:
         rGreaterArray = np.zeros_like(zArray) + rArray
 
         rGreaterArray[Cosmo_Parameters.chiofzint(zArray) + rArray >= Cosmo_Parameters.chiofzint(50)] = np.nan
+        
         zGreaterArray = Cosmo_Parameters.zfofRint(Cosmo_Parameters.chiofzint(zArray) + rGreaterArray)
 
         whereNotNans = np.invert(np.isnan(rGreaterArray))
