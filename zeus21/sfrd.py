@@ -23,7 +23,12 @@ from scipy import interpolate
 
 import pickle
 
-
+# SarahLibanore: for stochasticity computation
+from scipy.integrate import simpson
+from multiprocessing import Pool, cpu_count
+import warnings
+np.seterr(all='ignore')
+warnings.filterwarnings("ignore")
 
 class get_T21_coefficients:
     "Loops through SFRD integrals and obtains avg T21 and the coefficients for its power spectrum. Takes input zmin, which minimum z we integrate down to. It accounts for: \
@@ -752,6 +757,35 @@ def SFRD_III_integrand(Astro_Parameters, Cosmo_Parameters, ClassCosmo, HMF_inter
     return integrand_III
 
 
+# SarahLibanore: marginalize over SFR and M if you are using stochasticity 
+def marginalize_stochasticity(i, m, shape, Mh, log_SFR_values, SFR_values, integrate_axis, sigma_SFR_lim, sigma_SFR_idx, sigma_M, fstarM, fduty, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, z):
+
+    sigma_SFR = max(sigma_SFR_lim, sigma_SFR_idx * (m / 1e10 + sigma_SFR_lim))
+    
+    mu_SFR = m / Mh * dMh_dt(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, Mh, z)
+
+    if len(shape) == 2:
+        mu_SFR = mu_SFR[:, np.newaxis, :]
+    else:
+        mu_SFR = mu_SFR[:, :, :, np.newaxis, :]
+
+    log_mu_SFR = np.log10(mu_SFR)
+    coeff_SFR = 1. / (sigma_SFR * np.sqrt(2 * np.pi))
+    p_logSFRM = coeff_SFR * np.exp(-(log_SFR_values - log_mu_SFR)**2 / (2 * sigma_SFR ** 2))
+
+    SFR_marginalized_SFR = simpson(p_logSFRM / np.log(10) / SFR_values, SFR_values, axis=integrate_axis)
+    SFR_marginalized_SFR[SFR_marginalized_SFR < 1e-30] = 0
+
+    mu_M = fstarM * fduty * Mh
+    mu_M[mu_M < 1e-30] = 0.
+    log_mu_M = np.log10(mu_M)
+    coeff_M = 1. / (sigma_M * np.sqrt(2 * np.pi))
+    p_logMMh = coeff_M * np.exp(-(np.log10(m) - log_mu_M)**2 / (2 * sigma_M ** 2))
+    p_logMMh[p_logMMh < 1e-30] = 0
+
+    return SFR_marginalized_SFR, p_logMMh
+
+
 def SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, z2):
     "SFR in Msun/yr at redshift z. Evaluated at the halo masses Mh [Msun] of the HMF_interpolator, given Astro_Parameters"
     Mh = massVector
@@ -779,82 +813,53 @@ def SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 
         return SFR_det
     else:
 
+        SFR_det[SFR_det < 1e-30] = 0.
         # values see fig 2 in 2406.15237
-        M = np.logspace(2,15,147)
+        M = np.logspace(4,15,147)
 
-        if len(np.shape(SFR_det)) == 2:
-            SFR = SFR_det[:,np.newaxis,:]
-        elif len(np.shape(SFR_det)) == 4:
-            SFR = SFR_det[:,:,:,:,np.newaxis]        
+        shape = SFR_det.shape
 
-        SFR_values = np.logspace(-10,5,151)
-        if len(np.shape(SFR_det)) == 2:
+        SFR_values = np.logspace(np.log10(np.min(SFR_det[SFR_det > 0])), np.log10(np.max(SFR_det[SFR_det > 0])), 151)
+
+        SFR_values = SFR_values[SFR_values != 1]  
+
+        if len(shape) == 2:
             SFR_values = SFR_values[np.newaxis,:,np.newaxis]
-        elif len(np.shape(SFR_det)) == 4:
+            integrate_axis = 1
+        elif len(shape) == 4:
             SFR_values = SFR_values[np.newaxis,np.newaxis,np.newaxis,np.newaxis,:]
+            integrate_axis = 4   
+    
+        sigma_M = 0.3
+        sigma_SFR_lim = 0.19
+        sigma_SFR_idx = -0.12
 
-        sigma_M = 0.25
+        SFR_marginalized_SFR = np.zeros((len(M),) + SFR_det.shape)
+        p_logMMh = np.zeros((len(M),) + SFR_det.shape)
 
-        SFR_marginalized_SFR  = [] 
-        mu_M  = []
-        p_MMh  = [] 
-
-        #debug = []
-        import matplotlib.pyplot as plt
-
-        for i in range(len(M)):
-
-            sigma_SFR = -0.12*np.log10(M[i]) + 1.35 if np.log10(M[i]) < 10. else 0.19
-
-            # p_z(SFR|M_*) from 2406.15237 but we used log of mu_SFR
-            if len(np.shape(SFR_det)) == 2:
-                mu_SFR = np.log10(M[i]) - np.log10(0.43 / cosmology.Hubinvyr(Cosmo_Parameters,z))[:,np.newaxis,:] #this is the value in 2406.15237
-                integrate_axis = 1
-
-            elif len(np.shape(SFR_det)) == 4:
-                mu_SFR = np.log10(M[i]) - np.log10(0.43 / cosmology.Hubinvyr(Cosmo_Parameters,z))[:,:,np.newaxis,:] #this is the value in 2406.15237
-                integrate_axis = 4
-
-            # see Eq B2
-            p_SFRM = 1./(SFR_values*sigma_SFR*np.log(10.)*np.sqrt(2*np.pi)) * np.exp(-(np.log10(SFR_values)-mu_SFR)**2/2./sigma_SFR**2)
-
-            SFR_marginalized_SFR.append(np.trapz(SFR * p_SFRM, SFR_values,axis=integrate_axis))
-
-            #debug.append(p_SFRM)
-            if  len(np.shape(SFR_det)) == 2:
-                plt.figure(1)
-                plt.loglog(SFR_values[0,:,0],p_SFRM[0,:,0])
-
-            mu_M.append(-1.42 + np.log10(Mh) -np.log10((Mh/2.6e11)**-0.5+(Mh/2.6e11)**0.6))      
-
-            # p(M_*|M_h) from 2406.15237
-            p_MMh.append(1./(M[i]*np.log(10)*sigma_M*np.sqrt(2*np.pi)) * np.exp(-(np.log10(M[i])-mu_M[i])**2/2./sigma_M**2))
-
-        if  len(np.shape(SFR_det)) == 2:
-            #print(debug)
-            plt.figure(1)
-            plt.xlabel(r'$\rm SFR$')
-            plt.ylabel(r'$p_z({\rm SFR}|M_*)$')
-            plt.ylim(1e-7,1e4)
-            plt.show()
-
-            plt.figure(2)
-            plt.loglog(M,np.asarray(p_MMh)[:,0,5],label=r'$M_h = %g$'%Mh[0,5])
-            plt.loglog(M,np.asarray(p_MMh)[:,0,10],label=r'$M_h = %g$'%Mh[0,10])
-            plt.loglog(M,np.asarray(p_MMh)[:,0,20],label=r'$M_h = %g$'%Mh[0,20])
-            plt.legend()
-            plt.xlabel(r'$M_*$')
-            plt.ylabel(r'$p(M_*|M_h)$')
-            plt.ylim(1e-15,1e-4)
-            plt.show()
-
-        if len(np.shape(SFR_det)) == 2:
-            SFR_marginalized_MSFR = np.trapz(np.asarray(SFR_marginalized_SFR) * np.asarray(p_MMh), M, axis = 0)
-        elif len(np.shape(SFR_det)) == 4:
-            SFR_marginalized_MSFR = np.trapz(np.asarray(SFR_marginalized_SFR) * np.asarray(p_MMh), M, axis = 0)
+        log_SFR_values = np.log10(SFR_values)
+        # Parallelization
+        with Pool(cpu_count()-2) as pool:
+            results = pool.starmap(
+                marginalize_stochasticity, 
+                [(i, m, shape, Mh, log_SFR_values, SFR_values, integrate_axis,
+                sigma_SFR_lim, sigma_SFR_idx, sigma_M, fstarM, fduty, 
+                Astro_Parameters, Cosmo_Parameters, HMF_interpolator, z) for i, m in enumerate(M)]
+            )
         
-        #print(SFR_marginalized_MSFR)
-        return SFR_marginalized_MSFR
+        # Unpack results
+        SFR_marginalized_SFR, p_logMMh = zip(*results)
+        SFR_marginalized_SFR = np.array(SFR_marginalized_SFR)
+        p_logMMh = np.array(p_logMMh)
+
+        # Final integration
+        if len(shape) == 2:
+            SFR_marginalized_MSFR = simpson(SFR_marginalized_SFR * p_logMMh / np.log(10) / M[:, np.newaxis, np.newaxis], M, axis=0)
+            return np.squeeze(SFR_marginalized_MSFR) * SFR_det
+
+        elif len(shape) == 4:
+            SFR_marginalized_MSFR = simpson(SFR_marginalized_SFR * p_logMMh /np.log(10) / M[:, np.newaxis, np.newaxis, np.newaxis, np.newaxis], M, axis=0)
+            return SFR_marginalized_MSFR * SFR_det
 
 
 def SFR_III(Astro_Parameters, Cosmo_Parameters, ClassCosmo, HMF_interpolator, massVector, J21LW_interp, z, z2, vCB):
