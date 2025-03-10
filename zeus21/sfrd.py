@@ -773,7 +773,7 @@ def marginalize_stochasticity(i, m, shape, Mh, log_SFR_values, SFR_values, integ
     coeff_SFR = 1. / (sigma_SFR * np.sqrt(2 * np.pi))
     p_logSFRM = coeff_SFR * np.exp(-(log_SFR_values - log_mu_SFR)**2 / (2 * sigma_SFR ** 2))
 
-    SFR_marginalized_SFR = simpson(p_logSFRM / np.log(10) / SFR_values, SFR_values, axis=integrate_axis)
+    SFR_marginalized_SFR = simpson(p_logSFRM / np.log(10) , SFR_values, axis=integrate_axis) # multiplied and divided by SFR_values to get average value of SFR
     SFR_marginalized_SFR[SFR_marginalized_SFR < 1e-30] = 0
 
     mu_M = fstarM * fduty * Mh
@@ -815,11 +815,11 @@ def SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 
 
         SFR_det[SFR_det < 1e-30] = 0.
         # values see fig 2 in 2406.15237
-        M = np.logspace(4,15,147)
+        M = np.logspace(0,15,147)
 
         shape = SFR_det.shape
 
-        SFR_values = np.logspace(np.log10(np.min(SFR_det[SFR_det > 0])), np.log10(np.max(SFR_det[SFR_det > 0])), 151)
+        SFR_values = np.logspace(-12,4, 151)
 
         SFR_values = SFR_values[SFR_values != 1]  
 
@@ -855,11 +855,11 @@ def SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 
         # Final integration
         if len(shape) == 2:
             SFR_marginalized_MSFR = simpson(SFR_marginalized_SFR * p_logMMh / np.log(10) / M[:, np.newaxis, np.newaxis], M, axis=0)
-            return np.squeeze(SFR_marginalized_MSFR) * SFR_det
+            return np.squeeze(SFR_marginalized_MSFR) #* SFR_det
 
         elif len(shape) == 4:
             SFR_marginalized_MSFR = simpson(SFR_marginalized_SFR * p_logMMh /np.log(10) / M[:, np.newaxis, np.newaxis, np.newaxis, np.newaxis], M, axis=0)
-            return SFR_marginalized_MSFR * SFR_det
+            return SFR_marginalized_MSFR #* SFR_det
 
 
 def SFR_III(Astro_Parameters, Cosmo_Parameters, ClassCosmo, HMF_interpolator, massVector, J21LW_interp, z, z2, vCB):

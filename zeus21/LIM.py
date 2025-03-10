@@ -285,21 +285,33 @@ def LineLuminosity(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_inte
             if Line_Parameters.CII_sigma_LSFR == 0.:
                 output = 10.**log10_L
             else:
-                LSFR_mean = 10.**log10_L
                 
-                sigma = Line_Parameters.CII_sigma_LSFR * 2.302585
-                mu = lambda meanLSFR: np.log(meanLSFR) - (sigma**2)/2
-
-                Lval = lambda meanLSFR: np.linspace(meanLSFR-10*Line_Parameters.CII_sigma_LSFR, meanLSFR+10*Line_Parameters.CII_sigma_LSFR, 1000)
-
-                lognormal_nan = lambda meanLSFR: (1/(np.sqrt(2*np.pi)*sigma*Lval(meanLSFR)))*np.exp(- (np.log(Lval(meanLSFR))-mu(meanLSFR))**2/(2*sigma**2))
-
-                lognormal = lambda meanLSFR: np.where(np.isnan(lognormal_nan(meanLSFR)), 0, lognormal_nan(meanLSFR))
-
-                output_funct = lambda meanLM: np.trapz(lognormal(meanLM), Lval(meanLM))
-
-                output = np.vectorize(output_funct)(LSFR_mean)
+                mu_L = 10.**log10_L
+                mu_L[abs(log10_L) == np.inf] = 0.
                 
+                sigma_L = Line_Parameters.CII_sigma_LSFR 
+
+                Lval = np.logspace(-5,15,203)
+
+                coef = 1/(np.sqrt(2*np.pi)*sigma_L)
+
+                if len(mu_L.shape) == 2:
+
+                    p_logL =  coef * np.exp(- (np.log10(Lval[:,np.newaxis,np.newaxis])-np.log10(mu_L[np.newaxis,:]))**2/(2*(sigma_L)**2))
+
+                    p_logL = np.where(np.isnan(p_logL), 0, p_logL)
+
+                    p_logL[p_logL < 1e-30] = 0.
+
+                    output = SZ.simpson(p_logL / np.log(10) , Lval,axis=0)
+
+                elif len(mu_L.shape) == 4:
+                    p_logL = coef *  np.exp(- (np.log10(Lval[:,np.newaxis,np.newaxis,np.newaxis,np.newaxis])-np.log10(mu_L[np.newaxis,:]))**2/(2*(sigma_L)**2))
+                    p_logL = np.where(np.isnan(p_logL), 0, p_logL)
+                    p_logL[p_logL < 1e-30] = 0.
+
+                    output = SZ.simpson(p_logL / np.log(10) , Lval,axis=0)
+               
     else:
         output = -1
 
