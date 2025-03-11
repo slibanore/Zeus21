@@ -757,7 +757,8 @@ def SFRD_III_integrand(Astro_Parameters, Cosmo_Parameters, ClassCosmo, HMF_inter
     return integrand_III
 
 
-# SarahLibanore: marginalize over SFR and M if you are using stochasticity 
+# SarahLibanore: marginalize over SFR and M if you are using stochasticity - this change the average, not introduces fluctuations
+# !!! STILL DEBUGGING
 def marginalize_stochasticity(i, m, shape, Mh, log_SFR_values, SFR_values, integrate_axis, sigma_SFR_lim, sigma_SFR_idx, sigma_M, fstarM, fduty, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, z):
 
     sigma_SFR = max(sigma_SFR_lim, sigma_SFR_idx * (m / 1e10 + sigma_SFR_lim))
@@ -808,13 +809,15 @@ def SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 
 
     SFR_det = dMh_dt(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, Mh, z)  * fstarM * fduty
 
+    # SarahLibanore : introduced the possibility to add stochasticity in stellar M and SFR in the computation of the average SFRD (no extra fluctuations)
+    # STILL DEBUGGING
     if not Astro_Parameters.STOCHASTICITY:
         # this is the original output of the code 
         return SFR_det
     else:
 
         SFR_det[SFR_det < 1e-30] = 0.
-        # values see fig 2 in 2406.15237
+
         M = np.logspace(0,15,147)
 
         shape = SFR_det.shape
@@ -855,11 +858,11 @@ def SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 
         # Final integration
         if len(shape) == 2:
             SFR_marginalized_MSFR = simpson(SFR_marginalized_SFR * p_logMMh / np.log(10) / M[:, np.newaxis, np.newaxis], M, axis=0)
-            return np.squeeze(SFR_marginalized_MSFR) #* SFR_det
+            return np.squeeze(SFR_marginalized_MSFR) 
 
         elif len(shape) == 4:
             SFR_marginalized_MSFR = simpson(SFR_marginalized_SFR * p_logMMh /np.log(10) / M[:, np.newaxis, np.newaxis, np.newaxis, np.newaxis], M, axis=0)
-            return SFR_marginalized_MSFR #* SFR_det
+            return SFR_marginalized_MSFR 
 
 
 def SFR_III(Astro_Parameters, Cosmo_Parameters, ClassCosmo, HMF_interpolator, massVector, J21LW_interp, z, z2, vCB):

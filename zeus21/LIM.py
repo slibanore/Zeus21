@@ -11,11 +11,6 @@ import numpy as np
 import astropy.units as au
 import astropy.constants as ac
 
-# SL: TO DO !
-# We need to define the new set of parameters related with LIM --> in Line_Parameters
-# We need to model the line luminosities --> in LineLuminosity
-
-
 class get_LIM_coefficients:
     "Loops through rhoL integrals and obtains avg Inu and the coefficients for its power spectrum. Takes input zmin, which minimum z we integrate down to. "
 
@@ -28,7 +23,6 @@ class get_LIM_coefficients:
         # !!! SL: for us, Rtabsmoo --> Rtabsmoo_LIM is a scalar, given as input 
         # !!! SL: it should work also in case you want to use an array (e.g. redshift dependent)
         self.Rtabsmoo_LIM = Line_Parameters._R
-        # !!! SL: dlogRR = log(Rmax/Rmin)/(NR-1) does not exist
         
         # ----- same as sfrd.py
         #define the integration redshifts, goes as log(z) (1+ doesn't change sampling much)
@@ -42,9 +36,9 @@ class get_LIM_coefficients:
         # !!! SL: here we only use 1 value for R, so the matrix is Nz x 1 !!! 
         # !!! SL: we keep the matrix form to still allow a R array ---> if resolution based on instrument, angular res is fixed but gets converted
 
-        # !!! SL: check the dimensions, but they should be correct 
         #define table of redshifts and distances
-        self.rGreaterMatrix = np.transpose([Cosmo_Parameters.chiofzint(self.zintegral)]) #+ self.Rtabsmoo_LIM !!! 
+        # SL: since LIM is local we do not need to transform z[\chi(z) + R]
+        self.rGreaterMatrix = np.transpose([Cosmo_Parameters.chiofzint(self.zintegral)]) 
         self.zGreaterMatrix = Cosmo_Parameters.zfofRint(self.rGreaterMatrix)
         
         self.ztabRsmoo = np.nan_to_num(np.copy(self.zGreaterMatrix), nan = 100)
@@ -63,8 +57,6 @@ class get_LIM_coefficients:
             self.rGreaterMatrix[self.rGreaterMatrix > Cosmo_Parameters.chiofzint(50.0)] = np.nan #replace z > 50 = np.nan so that nothing exceeds zmax = 50
             self.ztabRsmoo = np.nan_to_num(np.copy(self.zGreaterMatrix), nan = 100)
             
-        zGreaterMatrix_nonan = np.nan_to_num(self.zGreaterMatrix, nan = 100)
-
         self.sigmaofRtab_LIM = np.array([HMF_interpolator.sigmaR_int(self.Rtabsmoo_LIM, zz) for zz in self.zintegral]) # sigma_R(z) used for non linear correction
 
         # EPS factors 
@@ -76,7 +68,7 @@ class get_LIM_coefficients:
 
         # line luminosity variable
         self.rhoL_avg = np.zeros_like(self.zintegral)
-        # !!! SL: this is 1D and not 2D as in the SFRD case because LIM is local and we average over a single R
+        # !!! SL: this is 1D and not 2D as in the SFRD case because LIM is local and we smooth over single R
         # !!! we keep the matrix shape in case we want to have more R
         self.rhoLbar = np.zeros((self.Nzintegral,1))
 
@@ -99,7 +91,7 @@ class get_LIM_coefficients:
             self.rhoLbar = rhoL_interp(np.nan_to_num(self.zGreaterMatrix, nan = 100))
             
         elif(Cosmo_Parameters.Flag_emulate_21cmfast==True): 
-            zpTable_LIM, tempTable_LIM, mTable_LIM = np.meshgrid(self.zintegral, self.Rtabsmoo_LIM, HMF_interpolator.Mhtab, indexing = 'ij', sparse = True)
+            mTable_LIM = np.meshgrid(self.zintegral, self.Rtabsmoo_LIM, HMF_interpolator.Mhtab, indexing = 'ij', sparse = True)[-1]
             # !!! SL: note that here the 1 in the axis = 1 direction is the R size. If you change Rtabsmoo_LIM you should change it to len(Rtabsmoo)
             zppTable_LIM = self.zGreaterMatrix.reshape((len(self.zintegral), 1, 1))
 
@@ -164,7 +156,9 @@ class get_LIM_coefficients:
 
             PS_HMF_corr = SZ.cosmology.PS_HMF_unnorm(Cosmo_Parameters, HMF_interpolator.Mhtab.reshape(len(HMF_interpolator.Mhtab),1),nu,dlogSdMcurr_LIM) * (1.0 + deltaArray_LIM)
 
-            integrand_LIM = PS_HMF_corr * LineLuminosity(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mArray_LIM, zGreaterArray) * mArray_LIM
+            SFR = SZ.SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mArray_LIM, zGreaterArray, 0.)
+
+            integrand_LIM = PS_HMF_corr * LineLuminosity(SFR, Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mArray_LIM, zGreaterArray) * mArray_LIM
             
         else:
             print("ERROR: Need to set FLAG_EMULATE_21CMFAST at True or False in the self.gammaLIM_index calculation.")
@@ -231,8 +225,6 @@ class get_LIM_coefficients:
                 self.coeff2_LIM *= _corrfactorEulerian_LIM
 
 
-
-
         ######################################################################################
         ### STEP 5: Compute the AVERAGE line intensity
 
@@ -247,22 +239,22 @@ def rhoL_integrand(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_inte
     "AVERAGE line luminosity density, modelled analogous to the SFRD. Line Parameters is a dictionary that contains information on the line that one wants to model"
 
     Mh = massVector # in Msun
-    
+
+    SFR = SZ.SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 0.)    
+
     HMF_curr = np.exp(HMF_interpolator.logHMFint((np.log(Mh), z))) # in Mpc-3 Msun-1 
 
-    Ltab_curr = LineLuminosity(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, Mh, z) 
+    Ltab_curr = LineLuminosity(SFR, Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, Mh, z) 
 
     integrand_LIM = HMF_curr * Ltab_curr * Mh # in Lsun / Mpc3 
 
     return integrand_LIM
 
 
-def LineLuminosity(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z):
+def LineLuminosity(SFR, Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z):
     "Luminosity for the different lines. Line Parameters is a dictionary that contains information on the line that one wants to model. Units: solar luminosity Lsun"
-
-    SFR = dot_Mstar(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z)
     
-    # TO BE MODELLED
+    # TO BE PROPERLY MODELLED
     if Line_Parameters.LINE == 'CO':
         output = -1
 
@@ -282,6 +274,8 @@ def LineLuminosity(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_inte
 
             log10_L = alpha_SFR * np.log10(SFR) + beta_SFR     
 
+            # here you can account for stochasticity in the luminosity - SFR relation (on the average, not introducing fluctuations)
+            # STILL DEBUGGING
             if Line_Parameters.CII_sigma_LSFR == 0.:
                 output = 10.**log10_L
             else:
@@ -316,23 +310,3 @@ def LineLuminosity(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_inte
         output = -1
 
     return output
-
-
-# ------------------- functions inherited from the sfrd.py module
-
-def SFRD_integrand(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z):
-    "AVERAGE star Formation Rate Density for ONLY POPII stars"
-
-    integrand = SZ.SFRD_II_integrand(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 0.) # we set z2 = 0.
-
-    return integrand
-
-
-# Inherited from the sfrd.py module
-def dot_Mstar(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z):
-    "Star Formation Rate in Msun/yr at redshift z for ONLY POPII stars"
-
-    output = SZ.SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 0.) # we set z2 = 0 
-
-    return output 
-
