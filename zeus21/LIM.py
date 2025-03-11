@@ -254,6 +254,9 @@ def rhoL_integrand(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_inte
 def LineLuminosity(SFR, Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z):
     "Luminosity for the different lines. Line Parameters is a dictionary that contains information on the line that one wants to model. Units: solar luminosity Lsun"
     
+    if SFR is False:
+        SFR = SZ.SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 0.)    
+        
     # TO BE PROPERLY MODELLED
     if Line_Parameters.LINE == 'CO':
         output = -1
