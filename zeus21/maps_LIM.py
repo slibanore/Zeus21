@@ -16,7 +16,9 @@ import powerbox as pbox
 from scipy.interpolate import interp1d
 from pyfftw import empty_aligned as empty
 
-class CoevalMaps_LIM:
+
+# This function produces density and LIM maps analogously to the way Zeus21 produces the 21cm ones, using the excess power between linear and non linear power spectra
+class CoevalMaps_LIM_zeuslike:
     "Class that calculates and keeps coeval maps, one z at a time."
 
     def __init__(self, LIM_coefficients, Power_Spectrum_LIM, Power_Spectrum, z, Lbox=600, Nbox=200, KIND=None, seed=1605):
@@ -87,7 +89,7 @@ class CoevalMaps_LIM:
                 dim=3,                     
                 pk = lambda k: lognormpower(k), 
                 boxlength = self.Lbox,           
-                seed = self.seed+1                # uncorrelated
+                seed = self.seed+1  # uncorrelated
             )
 
             self.LIMmapNL = self.Inu_global*pbe.delta_x()

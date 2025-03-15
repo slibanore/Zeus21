@@ -90,12 +90,12 @@ class get_T21_coefficients:
 
         self.gamma_index2D = np.zeros_like(self.SFRDbar2D) #index of SFR ~ exp(\gamma delta)
         self.gamma_II_index2D = np.zeros_like(self.SFRDbar2D) #index of SFR ~ exp(\gamma delta)
+        self.gamma2_II_index2D = np.zeros_like(self.SFRDbar2D) #index of SFR ~ exp(\gamma delta + \gamma_2 delta^2)
         self.gamma_III_index2D = np.zeros_like(self.SFRDbar2D) #index of SFR ~ exp(\gamma delta)
+        self.gamma2_III_index2D = np.zeros_like(self.SFRDbar2D) #index of SFR ~ exp(\gamma \delta + \gamma_2 \delta^2)
         
         self.niondot_avg = np.zeros_like(self.zintegral) #\dot nion at each z (int d(SFRD)/dM *fesc(M) dM)/rhobaryon
-        self.gamma_Niondot_index2D = np.zeros_like(self.SFRDbar2D) #index of SFR ~ exp(\gamma delta)
-
-
+        self.gamma_Niondot_index2D = np.zeros_like(self.SFRDbar2D) #index of SFR ~ exp(\gamma delta + \gamma_2 delta^2)
         
 #        ###HAC: OLD, TO BE DELETED, added SFRD variables for pop II and III stars
 #        self.gamma_index2D_old = np.zeros_like(self.SFRDbar2D) #index of SFR ~ exp(\gamma delta)
@@ -119,7 +119,7 @@ class get_T21_coefficients:
 
         #and EPS factors
         Nsigmad = 1.0 #how many sigmas we explore
-        Nds = 2 #how many deltas
+        Nds = 3 #how many deltas
         deltatab_norm = np.linspace(-Nsigmad,Nsigmad,Nds)
 
         #initialize Xrays
@@ -211,6 +211,7 @@ class get_T21_coefficients:
         dsigmadMcurr = HMF_interpolator.dsigmadMintlog((np.log(mArray),zGreaterArray)) ###HAC: Check this works when emulating 21cmFAST
         dlogSdMcurr = (dsigmadMcurr*sigmaM*2.0)/(modSigmaSq)
 
+        # SarahLibanore: make it callable from outside
         deltaArray = deltaNormArray * sigmaR
         # sMax = 0.3
         # deltaArray[Nsigmad * sigmaR > 1.0] = deltaNormArray * sMax
@@ -235,6 +236,7 @@ class get_T21_coefficients:
         ########
         # Compute SFRD quantities
         self.SFRD_II_dR = np.trapz(integrand_II, HMF_interpolator.logtabMh, axis = 2)
+        niondot_II_dR = np.trapz(integrand_II*fesctab_II[None, None, :, None], HMF_interpolator.logtabMh, axis = 2)
 
         ###
         if Astro_Parameters.USE_POPIII == True:
@@ -244,20 +246,60 @@ class get_T21_coefficients:
                 integrand_III = PS_HMF_corr * SFR_III(Astro_Parameters, Cosmo_Parameters, ClassCosmo, HMF_interpolator, mArray, J21LW_interp, zGreaterArray, zGreaterArray, ClassCosmo.pars['v_avg']) * mArray
 
             SFRD_III_dR = np.trapz(integrand_III, HMF_interpolator.logtabMh, axis = 2)
+            niondot_III_dR = np.trapz(integrand_III*fesctab_III[None, None, :, None], HMF_interpolator.logtabMh, axis = 2)
+
         else:
             SFRD_III_dR = np.zeros_like(self.SFRD_II_dR)
             
             
         #compute gammas
-        self.gamma_II_index2D = np.log(self.SFRD_II_dR[:,:,-1]/self.SFRD_II_dR[:,:,0]) / (deltaArray[:,:,0,-1] - deltaArray[:,:,0,0])
+        midpoint = deltaArray.shape[-1]//2 
+        
+        # self.gamma_II_index2D = np.log(self.SFRD_II_dR[:,:,-1]/self.SFRD_II_dR[:,:,0]) / (deltaArray[:,:,0,-1] - deltaArray[:,:,0,0])
+        self.gamma_II_index2D = np.log(self.SFRD_II_dR[:,:,midpoint+1]/self.SFRD_II_dR[:,:,midpoint-1]) / (deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1])
+
         self.gamma_II_index2D[np.isnan(self.gamma_II_index2D)] = 0.0
 
+        self.gamma_niondot_II_index2D = np.log(niondot_II_dR[:,:,midpoint+1]/niondot_II_dR[:,:,midpoint-1]) / (deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1])
+        self.gamma_niondot_II_index2D[np.isnan(self.gamma_niondot_II_index2D)] = 0.0
+
+        #compute second-order derivative gammas by computing two first-order derivatives #TODO: functionalize derivatives
+        der1_II =  np.log(self.SFRD_II_dR[:,:,midpoint]/self.SFRD_II_dR[:,:,midpoint-1])/(deltaArray[:,:,0,midpoint] - deltaArray[:,:,0,midpoint-1]) #ln(y2/y1)/(x2-x1)
+        der2_II =  np.log(self.SFRD_II_dR[:,:,midpoint+1]/self.SFRD_II_dR[:,:,midpoint])/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint]) #ln(y3/y2)/(x3-x2)
+        self.gamma2_II_index2D = (der2_II - der1_II)/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1]) #second derivative: (der2-der1)/((x3-x1)/2)
+        self.gamma2_II_index2D[np.isnan(self.gamma2_II_index2D)] = 0.0
+        
+        der1_niondot_II =  np.log(niondot_II_dR[:,:,midpoint]/niondot_II_dR[:,:,midpoint-1])/(deltaArray[:,:,0,midpoint] - deltaArray[:,:,0,midpoint-1]) #ln(y2/y1)/(x2-x1)
+        der2_niondot_II =  np.log(niondot_II_dR[:,:,midpoint+1]/niondot_II_dR[:,:,midpoint])/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint]) #ln(y3/y2)/(x3-x2)
+        self.gamma2_niondot_II_index2D = (der2_niondot_II - der1_niondot_II)/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1]) #second derivative: (der2-der1)/((x3-x1)/2)
+        self.gamma2_niondot_II_index2D[np.isnan(self.gamma2_niondot_II_index2D)] = 0.0
+
         if Astro_Parameters.USE_POPIII == True:
-            self.gamma_III_index2D = np.log(SFRD_III_dR[:,:,-1]/SFRD_III_dR[:,:,0]) / (deltaArray[:,:,0,-1] - deltaArray[:,:,0,0])
+            # self.gamma_III_index2D = np.log(SFRD_III_dR[:,:,-1]/SFRD_III_dR[:,:,0]) / (deltaArray[:,:,0,-1] - deltaArray[:,:,0,0])
+            self.gamma_III_index2D = np.log(SFRD_III_dR[:,:,midpoint+1]/SFRD_III_dR[:,:,midpoint-1]) / (deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1])
             self.gamma_III_index2D[np.isnan(self.gamma_III_index2D)] = 0.0
+
+            self.gamma_niondot_III_index2D = np.log(niondot_III_dR[:,:,midpoint+1]/niondot_III_dR[:,:,midpoint-1]) / (deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1])
+            self.gamma_niondot_III_index2D[np.isnan(self.gamma_niondot_III_index2D)] = 0.0
+
+            der1_III =  np.log(SFRD_III_dR[:,:,midpoint]/SFRD_III_dR[:,:,midpoint-1])/(deltaArray[:,:,0,midpoint] - deltaArray[:,:,0,midpoint-1]) #ln(y2/y1)/(x2-x1)
+            der2_III =  np.log(SFRD_III_dR[:,:,midpoint+1]/SFRD_III_dR[:,:,midpoint])/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint]) #ln(y3/y2)/(x3-x2)
+            self.gamma2_III_index2D = (der2_III - der1_III)/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1]) #second derivative: (der2-der1)/((x3-x1)/2)
+            self.gamma2_III_index2D[np.isnan(self.gamma2_III_index2D)] = 0.0
+
+            der1_niondot_III =  np.log(niondot_III_dR[:,:,midpoint]/niondot_III_dR[:,:,midpoint-1])/(deltaArray[:,:,0,midpoint] - deltaArray[:,:,0,midpoint-1]) #ln(y2/y1)/(x2-x1)
+            der2_niondot_III =  np.log(niondot_III_dR[:,:,midpoint+1]/niondot_III_dR[:,:,midpoint])/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint]) #ln(y3/y2)/(x3-x2)
+            self.gamma2_niondot_III_index2D = (der2_niondot_III - der1_niondot_III)/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1]) #second derivative: (der2-der1)/((x3-x1)/2)
+            self.gamma2_niondot_III_index2D[np.isnan(self.gamma2_niondot_III_index2D)] = 0.0
+
         else:
             self.gamma_III_index2D = np.zeros_like(self.gamma_II_index2D)
-           
+
+            self.gamma2_III_index2D = np.zeros_like(self.gamma2_II_index2D)
+            self.gamma_niondot_III_index2D = np.zeros_like(self.gamma_niondot_II_index2D)
+            self.gamma2_niondot_III_index2D = np.zeros_like(self.gamma2_niondot_II_index2D)
+
+
         #####################################################################################################
         ### STEP 3: Computing lambdas in velocity anisotropies
         ### Because we found the SFRD vcb dependence to be delta independent, we compute quantities below for a variety of R's and delta_R = 0

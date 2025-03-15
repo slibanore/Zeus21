@@ -82,7 +82,7 @@ class get_LIM_coefficients:
         zLIMflat = np.geomspace(self.zmin, 50, 128) #extend to z = 50 for extrapolation purposes. Higher in z than self.zintegral  
         zLIM, mArray_LIM = np.meshgrid(zLIMflat, HMF_interpolator.Mhtab, indexing = 'ij', sparse = True)
 
-        rhoL_avg = np.trapz(rhoL_integrand(Line_Parameters,Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mArray_LIM, zLIM), HMF_interpolator.logtabMh, axis = 1) 
+        rhoL_avg = np.trapz(rhoL_integrand(False, Line_Parameters,Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mArray_LIM, zLIM), HMF_interpolator.logtabMh, axis = 1) 
         rhoL_interp = SZ.interpolate.interp1d(zLIMflat, rhoL_avg, kind = 'cubic', bounds_error = False, fill_value = 0,) 
 
         self.rhoL_avg = rhoL_interp(self.zintegral)
@@ -95,7 +95,7 @@ class get_LIM_coefficients:
             # !!! SL: note that here the 1 in the axis = 1 direction is the R size. If you change Rtabsmoo_LIM you should change it to len(Rtabsmoo)
             zppTable_LIM = self.zGreaterMatrix.reshape((len(self.zintegral), 1, 1))
 
-            self.rhoLbar = np.trapz(rhoL_integrand(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mTable_LIM, zppTable_LIM), HMF_interpolator.logtabMh, axis = 2)
+            self.rhoLbar = np.trapz(rhoL_integrand(False, Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mTable_LIM, zppTable_LIM), HMF_interpolator.logtabMh, axis = 2)
 
             self.rhoLbar[np.isnan(self.rhoLbar)] = 0.0
 
@@ -150,15 +150,13 @@ class get_LIM_coefficients:
         # last 1+delta product converts from Lagrangian to Eulerian
             EPS_HMF_corr = (nu/nu0) * (sigmaM_LIM/modSigmaSq_LIM)**2.0 * np.exp(-Cosmo_Parameters.a_corr_EPS * (nu**2-nu0**2)/2.0 ) * (1.0 + deltaArray_LIM)
 
-            integrand_LIM = EPS_HMF_corr * rhoL_integrand(Line_Parameters,Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mArray_LIM, zGreaterArray)
+            integrand_LIM = EPS_HMF_corr * rhoL_integrand(False, Line_Parameters,Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mArray_LIM, zGreaterArray)
             
         elif(Cosmo_Parameters.Flag_emulate_21cmfast==True): #as 21cmFAST, use PS HMF, integrate and normalize at the end
 
             PS_HMF_corr = SZ.cosmology.PS_HMF_unnorm(Cosmo_Parameters, HMF_interpolator.Mhtab.reshape(len(HMF_interpolator.Mhtab),1),nu,dlogSdMcurr_LIM) * (1.0 + deltaArray_LIM)
 
-            SFR = SZ.SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mArray_LIM, zGreaterArray, 0.)
-
-            integrand_LIM = PS_HMF_corr * LineLuminosity(SFR, Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mArray_LIM, zGreaterArray) * mArray_LIM
+            integrand_LIM = PS_HMF_corr * LineLuminosity(False, Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mArray_LIM, zGreaterArray) * mArray_LIM
             
         else:
             print("ERROR: Need to set FLAG_EMULATE_21CMFAST at True or False in the self.gammaLIM_index calculation.")
@@ -235,12 +233,13 @@ class get_LIM_coefficients:
 
 # ------------------- here we define the functions needed in the module
     
-def rhoL_integrand(Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z):
+def rhoL_integrand(SFR, Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z):
     "AVERAGE line luminosity density, modelled analogous to the SFRD. Line Parameters is a dictionary that contains information on the line that one wants to model"
 
     Mh = massVector # in Msun
 
-    SFR = SZ.SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 0.)    
+    if SFR is False:
+        SFR = SZ.SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, z)    
 
     HMF_curr = np.exp(HMF_interpolator.logHMFint((np.log(Mh), z))) # in Mpc-3 Msun-1 
 
