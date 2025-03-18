@@ -19,6 +19,9 @@ from pyfftw import empty_aligned as empty
 from tqdm import trange
 import time
 
+import astropy
+from astropy import units as u
+
 
 class CoevalMaps:
     "Class that calculates and keeps coeval maps, one z at a time."
@@ -80,7 +83,6 @@ class CoevalMaps:
 
             powerratioint = interp1d(klist,PdT21/Pd,fill_value=0.0,bounds_error=False)
 
-
             deltak = pb.delta_k()
 
             powerratio = powerratioint(pb.k())
@@ -112,7 +114,7 @@ class CoevalMaps:
             print('ERROR, KIND not implemented yet!')
 
 
-def make_ion_fields(CosmoParams, CoeffStructure, ClassyCosmo, CorrFClass, BMF, input_z, boxlength=300., ncells=300, seed=1234, r_precision=1., timer=True, logd = False, barrier = None, spherize=False, FLAG_return_densities = 0):
+def make_ion_fields(CosmoParams, AstroParams, CoeffStructure, ClassyCosmo, CorrFClass, BMF, input_z, boxlength=300., ncells=300, seed=1234, r_precision=1., timer=True, logd = False, barrier = None, spherize=False, FLAG_return_densities = 0):
     """
     Generates a 3D map of ionized fields and ionized fraction of hydrogen.
     
@@ -210,22 +212,43 @@ def make_ion_fields(CosmoParams, CoeffStructure, ClassyCosmo, CorrFClass, BMF, i
         z21_utilities.print_timer(start_time, 'Smoothing...')
 
     #comment
-    smooth_density_fields = np.array([z21_utilities.tophat_smooth(rr, klist3Dfft, density_fft) for rr in r])
+    smooth_density_fields = np.array([z21_utilities.tophat_smooth(rr, 
+    klist3Dfft, density_fft) for rr in r])
+
+    # SarahLibanore: ionizing photons per cell 
+    L_cell_Mpc = boxlength/ncells * u.Mpc
+    sphere_FACTOR = 0.620350491 # factor relating cube length to filter radius = (4PI/3)^(-1/3)
+
+    smooth_density_fields_cell = (np.array(z21_utilities.tophat_smooth(L_cell_Mpc.value * sphere_FACTOR, 
+    klist3Dfft, density_fft))).flatten()
+
+    idx_cell = np.abs(r - L_cell_Mpc.value * sphere_FACTOR).argmin()
+    z_idx_cell = np.abs(zlist - z).argmin()
+
+    n_ion_photon_map = BMF.nion_delta_r_int(smooth_density_fields_cell, idx_cell)
+    n_rec_map = BMF.nrec(smooth_density_fields_cell, BMF.ion_frac)
 
     if timer:
         z21_utilities.print_timer(start_time, 'Creating ionized field...')
 
     if barrier is None:
         barrier = BMF.barrier
+
     ion_fields = []
+    xHI_map = []
     ion_frac = np.zeros(len(z))
-    for i in trange(len(z)):
+    for i in range(len(z)):
         curr_z_idx = z_idx[i]
         ion_field = ionize(CosmoParams, zlist, Rs, curr_z_idx, smooth_density_fields, barrier, r_idx, klist3Dfft, spherize)
         ion_fields.append(ion_field)
         ion_frac[i] = np.sum(ion_field)/ncells**3
+        
+        # SarahLibanore: xHI map 
+        xHI_map = np.maximum(0,np.minimum(1,(1.+n_rec_map[:,z_idx_cell] - n_ion_photon_map[:,z_idx_cell])))
     
     ion_fields = np.array(ion_fields)
+    xHI_map = np.array(xHI_map).reshape((ncells,ncells,ncells))
+
 
     if timer:
         print('Done!')
@@ -233,20 +256,21 @@ def make_ion_fields(CosmoParams, CoeffStructure, ClassyCosmo, CorrFClass, BMF, i
         z21_utilities.print_timer(start_time)
 
     if FLAG_return_densities == 0:
-        return ion_fields, ion_frac
+        return ion_fields, ion_frac, xHI_map
 
     elif FLAG_return_densities == 1:
-        return ion_fields, ion_frac, density_field
+        return ion_fields, ion_frac, density_field, xHI_map
 
     elif FLAG_return_densities == 2:
-        return ion_fields, ion_frac, density_field, smooth_density_fields
+        return ion_fields, ion_frac, density_field, smooth_density_fields, xHI_map
 
     else:
         print('WARNING: FLAG_return_densities is not set to (0, 1, or 2). Defaulting to 0.')
-        return ion_fields, ion_frac
+        return ion_fields, ion_frac, xHI_map
 
 #look over this again
 def ionize(CosmoParams, zlist, Rs, curr_z_idx, smooth_density_fields, barrier, r_idx, klist3Dfft, spherize):
+
     Dg0 = CosmoParams.growthint(zlist[0])
     Dg = CosmoParams.growthint(zlist[curr_z_idx])
     if not spherize:
@@ -279,3 +303,74 @@ def powerboxCtoR(pbobject,mapkin = None):
     realmap = np.real(realmap)
 
     return realmap
+
+
+# SarahLibanore: Temperature map using the local xHI instead of the average one
+class T21_bubbles:
+
+    def __init__(self, T21_coefficients, Power_Spectrum, z, Lbox, Nbox, seed, CorrFClass, CosmoParams, AstroParams, ClassyCosmo, BMF):
+
+        zlist = T21_coefficients.zintegral 
+        _iz = min(range(len(zlist)), key=lambda i: np.abs(zlist[i]-z)) #pick closest z
+        self.T21global = T21_coefficients.T21avg[_iz]
+        self.xHavg = T21_coefficients.xHI_avg[_iz]
+        self.T21global_scaled = self.T21global / self.xHavg
+
+        self.Nbox = Nbox
+        self.Lbox = Lbox
+        self.seed = seed
+        self.z = zlist[_iz] #will be slightly different from z input
+
+        klist = Power_Spectrum.klist_PS
+        k3over2pi2 = klist**3/(2*np.pi**2)
+
+        temp = make_ion_fields(CosmoParams, AstroParams, T21_coefficients, ClassyCosmo, CorrFClass, BMF, z, boxlength=Lbox, ncells=Nbox, seed=seed, r_precision=1., timer=False, logd = False, barrier = None, spherize=False, FLAG_return_densities = 0)
+        self.xHI_map = temp[-1] * (1-temp[0][0])
+
+        Pd = Power_Spectrum.Deltasq_d_lin[_iz,:]/k3over2pi2
+        Pdinterp = interp1d(klist,Pd,fill_value=0.0,bounds_error=False)
+
+        pb = pbox.PowerBox(
+            N=self.Nbox,                     
+            dim=3,                     
+            pk = lambda k: Pdinterp(k), 
+            boxlength = self.Lbox,           
+            seed = self.seed               
+        )
+
+        self.deltamap = pb.delta_x() #density map, basis of this KIND of approach
+
+        #then we make a map of the linear T21 fluctuation, better to use the cross to keep sign, at linear level same 
+        PdT21_scaled = Power_Spectrum.Deltasq_dT21[_iz]/k3over2pi2 / self.xHavg
+
+        powerratioint = interp1d(klist,PdT21_scaled/Pd,fill_value=0.0,bounds_error=False)
+
+        deltak = pb.delta_k()
+
+        powerratio = powerratioint(pb.k())
+        T21lin_k = powerratio * deltak 
+        self.T21maplin= self.T21global_scaled + powerboxCtoR(pb,mapkin = T21lin_k) 
+
+        #now make a nonlinear correction, built as \sum_R [e^(gR dR) - gR dR]. Uncorrelatd with all dR so just a separate field!
+        #NOTE: its not guaranteed to work, excess power can be negative in some cases! Not for each component xa, Tk, but yes for T21
+        excesspower21_scaled = (Power_Spectrum.Deltasq_T21[_iz,:] - Power_Spectrum.Deltasq_T21_lin[_iz,:])/k3over2pi2 / self.xHavg**2
+
+        lognormpower = interp1d(klist,excesspower21_scaled/self.T21global_scaled**2,fill_value=0.0,bounds_error=False)
+        #G or logG? TODO revisit
+        pbe = pbox.LogNormalPowerBox(
+            N=self.Nbox,                     
+            dim=3,                     
+            pk = lambda k: lognormpower(k), 
+            boxlength = self.Lbox,           
+            seed = self.seed+1                # uncorrelated
+        )
+
+        self.T21mapNL = self.T21global_scaled*pbe.delta_x()
+
+        #and finally, just add them together!
+        self.T21map = self.T21maplin +  self.T21mapNL
+
+        self.T21map *= self.xHI_map
+
+
+
