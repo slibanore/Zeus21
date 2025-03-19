@@ -178,13 +178,8 @@ class get_LIM_coefficients:
         
         #2D cube, dimensions are (z,R) = (64, 1)
 
-        if Line_Parameters.LINE == 'CO':
-            nu_line_rest = -1
-        elif Line_Parameters.LINE == 'CII':
-            nu_line_rest = Line_Parameters.CII_nu_rest
-        else:
-            nu_line_rest = -1
-            
+        nu_line_rest = Line_Parameters.nu_rest
+
         if Line_Parameters.OBSERVABLE_LIM == 'Tnu':
 
             # c1 = uK / Lsun * Mpc^3
@@ -256,17 +251,21 @@ def LineLuminosity(SFR, Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF
     if SFR is False:
         SFR = SZ.SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 0.)    
         
+    if  Line_Parameters.LINE != 'CII' and  Line_Parameters.LINE != 'OII' and  Line_Parameters.LINE != 'OIII':
+        print('You asked for a line that is not yet implemented!')
+        return -1
+
+    alpha_SFR = Line_Parameters.alpha_SFR_0 
+    beta_SFR = Line_Parameters.beta_SFR_0 
+    
     # TO BE PROPERLY MODELLED
-    if Line_Parameters.LINE == 'CO':
-        output = -1
+    if Line_Parameters.LINE == 'CII':
 
-    elif Line_Parameters.LINE == 'CII':
+        if Line_Parameters.LINE_MODEL == 'Lagache18': 
 
-        if Line_Parameters.CII_MODEL == 'Lagache18': 
+            alpha_SFR += Line_Parameters.CII_alpha_SFR_z * z
 
-            alpha_SFR = Line_Parameters.CII_alpha_SFR_0 + Line_Parameters.CII_alpha_SFR_z * z
-
-            beta_SFR = Line_Parameters.CII_beta_SFR_0 + Line_Parameters.CII_beta_SFR_z * z
+            beta_SFR += Line_Parameters.CII_beta_SFR_z * z
 
             try:
                 alpha_SFR[alpha_SFR < 0.] = 0. 
@@ -276,39 +275,48 @@ def LineLuminosity(SFR, Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF
 
             log10_L = alpha_SFR * np.log10(SFR) + beta_SFR     
 
-            # here you can account for stochasticity in the luminosity - SFR relation (on the average, not introducing fluctuations)
-            # STILL DEBUGGING
-            if Line_Parameters.CII_sigma_LSFR == 0.:
-                output = 10.**log10_L
-            else:
-                
-                mu_L = 10.**log10_L
-                mu_L[abs(log10_L) == np.inf] = 0.
-                
-                sigma_L = Line_Parameters.CII_sigma_LSFR 
+    elif Line_Parameters.LINE == 'OIII' or Line_Parameters.LINE == 'OII':
 
-                Lval = np.logspace(-5,15,203)
+        if Line_Parameters.LINE_MODEL == 'Yang24':
 
-                coef = 1/(np.sqrt(2*np.pi)*sigma_L)
+            N = Line_Parameters.line_N 
+            SFR1 = Line_Parameters.line_SFR1
 
-                if len(mu_L.shape) == 2:
+            L_line = 2. * N * SFR / ((SFR / SFR1)**(-alpha_SFR) + (SFR / SFR1)**beta_SFR)
 
-                    p_logL =  coef * np.exp(- (np.log10(Lval[:,np.newaxis,np.newaxis])-np.log10(mu_L[np.newaxis,:]))**2/(2*(sigma_L)**2))
+            log10_L = np.log10(L_line)
 
-                    p_logL = np.where(np.isnan(p_logL), 0, p_logL)
-
-                    p_logL[p_logL < 1e-30] = 0.
-
-                    output = SZ.simpson(p_logL / np.log(10) , Lval,axis=0)
-
-                elif len(mu_L.shape) == 4:
-                    p_logL = coef *  np.exp(- (np.log10(Lval[:,np.newaxis,np.newaxis,np.newaxis,np.newaxis])-np.log10(mu_L[np.newaxis,:]))**2/(2*(sigma_L)**2))
-                    p_logL = np.where(np.isnan(p_logL), 0, p_logL)
-                    p_logL[p_logL < 1e-30] = 0.
-
-                    output = SZ.simpson(p_logL / np.log(10) , Lval,axis=0)
-               
+    # here you can account for stochasticity in the luminosity - SFR relation (on the average, not introducing fluctuations)
+    # STILL DEBUGGING
+    if Line_Parameters.sigma_LSFR == 0.:
+        output = 10.**log10_L
     else:
-        output = -1
+        
+        mu_L = 10.**log10_L
+        mu_L[abs(log10_L) == np.inf] = 0.
+        
+        sigma_L = Line_Parameters.sigma_LSFR 
+
+        Lval = np.logspace(-5,15,203)
+
+        coef = 1/(np.sqrt(2*np.pi)*sigma_L)
+
+        if len(mu_L.shape) == 2:
+
+            p_logL =  coef * np.exp(- (np.log10(Lval[:,np.newaxis,np.newaxis])-np.log10(mu_L[np.newaxis,:]))**2/(2*(sigma_L)**2))
+
+            p_logL = np.where(np.isnan(p_logL), 0, p_logL)
+
+            p_logL[p_logL < 1e-30] = 0.
+
+            output = SZ.simpson(p_logL / np.log(10) , Lval,axis=0)
+
+        elif len(mu_L.shape) == 4:
+            p_logL = coef *  np.exp(- (np.log10(Lval[:,np.newaxis,np.newaxis,np.newaxis,np.newaxis])-np.log10(mu_L[np.newaxis,:]))**2/(2*(sigma_L)**2))
+            p_logL = np.where(np.isnan(p_logL), 0, p_logL)
+            p_logL[p_logL < 1e-30] = 0.
+
+            output = SZ.simpson(p_logL / np.log(10) , Lval,axis=0)
+               
 
     return output
