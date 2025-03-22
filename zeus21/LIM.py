@@ -193,10 +193,10 @@ class get_LIM_coefficients:
         elif Line_Parameters.OBSERVABLE_LIM == 'Inu':
 
             # nu_rest for CII is in Hz, speed of light in km / s , Hubble in km / s / Mpc --> c1 = cm / sr / Hz
-            self.coeff1_LIM = ((SZ.constants.c_kms * au.km/au.s) / (4*np.pi * (SZ.cosmology.Hub(Cosmo_Parameters, self.zintegral) * au.km/au.s/au.Mpc) * nu_line_rest * au.Hz)) * SZ.constants.Mpctocm
+            self.coeff1_LIM = ((((SZ.constants.c_kms * au.km/au.s) / (4*np.pi * (SZ.cosmology.Hub(Cosmo_Parameters, self.zintegral) * au.km/au.s/au.Mpc) * nu_line_rest * au.Hz)) * au.Lsun / au.Mpc**3/au.steradian).to(au.Jy/au.steradian)).value
 
             # c2 = Lbar = Lsun / Mpc^3 
-            self.coeff2_LIM = self.rhoLbar / SZ.constants.Mpctocm**3
+            self.coeff2_LIM = self.rhoLbar 
 
             # --> c1*c2 = Lsun / (cm^2 * sr * Hz) 
 
