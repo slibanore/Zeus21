@@ -194,13 +194,13 @@ class get_T21_coefficients:
 
         whereNotNans = np.invert(np.isnan(rGreaterArray))
 
-        sigmaR = np.zeros((len(self.zintegral), len(self.Rtabsmoo), 1, 1))
-        sigmaR[whereNotNans] = HMF_interpolator.sigmaRintlog((np.log(rGreaterArray)[whereNotNans], zGreaterArray[whereNotNans]))
+        self.sigmaR = np.zeros((len(self.zintegral), len(self.Rtabsmoo), 1, 1))
+        self.sigmaR[whereNotNans] = HMF_interpolator.sigmaRintlog((np.log(rGreaterArray)[whereNotNans], zGreaterArray[whereNotNans]))
 
         sigmaM = np.zeros((len(self.zintegral), len(self.Rtabsmoo), len(HMF_interpolator.Mhtab), 1)) ###HAC: Is this necessary?
         sigmaM = HMF_interpolator.sigmaintlog((np.log(mArray), zGreaterArray))
 
-        modSigmaSq = sigmaM**2 - sigmaR**2
+        modSigmaSq = sigmaM**2 - self.sigmaR**2
         indexTooBig = (modSigmaSq <= 0.0)
         modSigmaSq[indexTooBig] = np.inf #if sigmaR > sigmaM the halo does not fit in the radius R. Cut the sum
         modSigma = np.sqrt(modSigmaSq)
@@ -212,7 +212,7 @@ class get_T21_coefficients:
         dlogSdMcurr = (dsigmadMcurr*sigmaM*2.0)/(modSigmaSq)
 
         # SarahLibanore: make it callable from outside
-        deltaArray = deltaNormArray * sigmaR
+        deltaArray = deltaNormArray * self.sigmaR
         # sMax = 0.3
         # deltaArray[Nsigmad * sigmaR > 1.0] = deltaNormArray * sMax
 
@@ -315,6 +315,8 @@ class get_T21_coefficients:
 
                 zArray, rArray, mArray, velArray = np.meshgrid(self.zintegral, self.Rtabsmoo, HMF_interpolator.Mhtab, vAvg_array, indexing = 'ij', sparse = True)
 
+                # SarahLibanore: this is the same as in the previous definition of sigmaR, is this needed?
+                # if it is the same, just set sigmaR_popIII equal to sigmaR (and same for sigmaM)
                 rGreaterArray = np.zeros_like(zArray) + rArray
 
                 rGreaterArray[Cosmo_Parameters.chiofzint(zArray) + rArray >= Cosmo_Parameters.chiofzint(50)] = np.nan
@@ -322,13 +324,13 @@ class get_T21_coefficients:
 
                 whereNotNans = np.invert(np.isnan(rGreaterArray))
 
-                sigmaR = np.zeros((len(self.zintegral), len(self.Rtabsmoo), 1, 1))
-                sigmaR[whereNotNans] = HMF_interpolator.sigmaRintlog((np.log(rGreaterArray)[whereNotNans], zGreaterArray[whereNotNans]))
+                self.sigmaR_popIII = np.zeros((len(self.zintegral), len(self.Rtabsmoo), 1, 1))
+                self.sigmaR_popIII[whereNotNans] = HMF_interpolator.sigmaRintlog((np.log(rGreaterArray)[whereNotNans], zGreaterArray[whereNotNans]))
 
                 sigmaM = np.zeros((len(self.zintegral), len(self.Rtabsmoo), len(HMF_interpolator.Mhtab), 1)) ###HAC: Is this necessary?
                 sigmaM = HMF_interpolator.sigmaintlog((np.log(mArray), zGreaterArray))
 
-                modSigmaSq = sigmaM**2 - sigmaR**2
+                modSigmaSq = sigmaM**2 - self.sigmaR_popIII**2
                 indexTooBig = (modSigmaSq <= 0.0)
                 modSigmaSq[indexTooBig] = np.inf #if sigmaR > sigmaM the halo does not fit in the radius R. Cut the sum
                 modSigma = np.sqrt(modSigmaSq)
@@ -339,7 +341,7 @@ class get_T21_coefficients:
                 dsigmadMcurr = HMF_interpolator.dsigmadMintlog((np.log(mArray),zGreaterArray)) ###HAC: Check this works when emulating 21cmFAST
                 dlogSdMcurr = (dsigmadMcurr*sigmaM*2.0)/(modSigmaSq)
 
-                deltaZero = np.zeros_like(sigmaR)
+                deltaZero = np.zeros_like(self.sigmaR_popIII)
                 # sMax = 0.3
                 # deltaArray[Nsigmad * sigmaR > 1.0] = deltaNormArray * sMax
 

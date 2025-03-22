@@ -567,23 +567,36 @@ class Power_Spectra:
 
         # SarahLibanore : change to introduce quantities required in the second order correction
         # --- #
-        gammaR1 = T21_coefficients.gamma_II_index2D[:, _iRnonlinear] * growthRmatrix
-        g1 = gammaR1.reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
-        g2 = gammaR1.reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
+        growthRmatrix1 = growthRmatrix.reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
+        growthRmatrix2 = growthRmatrix.reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
+        growth_corr = growthRmatrix1 * growthRmatrix2
+
+        gammaR1 = T21_coefficients.gamma_II_index2D[:, _iRnonlinear] 
+        sigmaR1 = np.squeeze(T21_coefficients.sigmaR)[:, _iRnonlinear]
+        sR1 = (sigmaR1).reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
+        sR2 = (sigmaR1).reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
+
+        g1 = (gammaR1 * sigmaR1).reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
+        g2 = (gammaR1 * sigmaR1).reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
         gammamatrixR1R1 = g1 * g2
 
-        gammaTimesCorrdNL = ne.evaluate('gammamatrixR1R1 * corrdNL')#np.einsum('ijkl,ijkl->ijkl', gammamatrixR1R1, corrdNL, optimize = True) #same thing as gammamatrixR1R1 * corrdNL but faster
+        corrdNL_gs = ne.evaluate('corrdNL * growth_corr / (sR1 * sR2)')
+
+        gammaTimesCorrdNL = ne.evaluate('gammamatrixR1R1 * corrdNL_gs')
 
         if Cosmo_Parameters.second_order_SFRD:
 
-            gammaR1NL = T21_coefficients.gamma2_II_index2D[:, _iRnonlinear] * pow(growthRmatrix,2) # because it multiplies delta^2
-            g1NL = gammaR1NL.reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
-            g2NL = gammaR1NL.reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
+            gammaR1NL = T21_coefficients.gamma2_II_index2D[:, _iRnonlinear] 
+            g1NL = (gammaR1NL * sigmaR1**2).reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
+            g2NL = (gammaR1NL * sigmaR1**2).reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
 
-            numerator_NL = ne.evaluate('gammaTimesCorrdNL + (g1 * g1 * (0.5 - g2NL * (1 - corrdNL*corrdNL)) + g2 * g2 * (0.5 - g1NL * (1 - corrdNL*corrdNL))) ')
-            denominator_NL = ne.evaluate('1 - 2 * g1NL - 2 * g2NL + 4 * g1NL * g2NL * (1 - corrdNL*corrdNL)')
+            numerator_NL = ne.evaluate('gammaTimesCorrdNL + g1 * g1 * (0.5 - g2NL * (1 - corrdNL_gs * corrdNL_gs)) + g2 * g2 * (0.5 - g1NL * (1 - corrdNL_gs * corrdNL_gs))')
+            
+            denominator_NL = ne.evaluate('1 - 2 * g1NL - 2 * g2NL + 4 * g1NL * g2NL * (1 - corrdNL_gs * corrdNL_gs)')
+            
             norm1 = ne.evaluate('exp(g1 * g1 / (2 - 4 * g1NL)) / sqrt(1 - 2 * g1NL)') 
             norm2 = ne.evaluate('exp(g2 * g2 / (2 - 4 * g2NL)) / sqrt(1 - 2 * g2NL)') 
+            
             nonlinearcorrelation = ne.evaluate('exp(numerator_NL/denominator_NL) / sqrt(denominator_NL) / norm1 / norm2')
 
             # use second order in SFRD lognormal approx
@@ -607,8 +620,6 @@ class Power_Spectra:
 
             self._II_deltaxi_d = (np.exp(growthRmatrix[:,:1]**2 * corrdNL[0,0,0,:]) - 1.0) - growthRmatrix[:,:1]**2 * corrdNL[0,0,0,:]
 
-
-
         ### To compute Tx quantities, I'm broadcasting arrays such that the axes are zp1, R1, zp2, R2, and looping over r
         coeffzp1Tx = np.copy(T21_coefficients.coeff1Xzp).reshape(*T21_coefficients.coeff1Xzp.shape, 1, 1, 1)
         coeffzp2Tx = np.copy(T21_coefficients.coeff1Xzp).reshape(1, 1, *T21_coefficients.coeff1Xzp.shape, 1)
@@ -627,31 +638,41 @@ class Power_Spectra:
         # SarahLibanore : change to introduce quantities required in the second order correction
         # --- #
         gammaR2 = np.copy(gammaR1) #already has growth factor in this
+        sigmaR2 = np.copy(sigmaR1) #already has growth factor in this
 
-        g1 = gammaR1.reshape(*gammaR1.shape, 1, 1)
-        g2 = gammaR2.reshape(1, 1, *gammaR2.shape)
+        growthRmatrix1 = growthRmatrix.reshape(*gammaR1.shape, 1, 1)
+        growthRmatrix2 = growthRmatrix.reshape(1, 1, *gammaR2.shape)
+        growth_corr = growthRmatrix1 * growthRmatrix2
+
+        g1 = (gammaR1 * sigmaR1).reshape(*gammaR1.shape, 1, 1)
+        sR1 = (sigmaR1).reshape(*gammaR1.shape, 1, 1)
+        g2 = (gammaR2 * sigmaR2).reshape(1, 1, *gammaR2.shape)
+        sR2 = (sigmaR2).reshape(1, 1, *gammaR2.shape)
         if Cosmo_Parameters.second_order_SFRD:
-            gammaR2NL = np.copy(gammaR1NL) #already has growth factor in this
-            g1NL = gammaR1NL.reshape(*gammaR1NL.shape, 1, 1)
-            g2NL = gammaR2NL.reshape(1, 1, *gammaR2NL.shape)
+            gammaR2NL = np.copy(gammaR1NL)
+            g1NL = (gammaR1NL * sigmaR1**2).reshape(*gammaR1NL.shape, 1, 1)
+            g2NL = (gammaR2NL * sigmaR2**2).reshape(1, 1, *gammaR2NL.shape)
 
         gammamatrixR1R2 = g1 * g2
 
         for ir in range(len(T21_coefficients.Rtabsmoo)):
             corrdNL = corrdNLBIG[:,:,:,:,ir]
-            
+            corrdNL_gs = ne.evaluate('corrdNL * growth_corr / (sR1 * sR2)')
             #HAC: Computations using ne.evaluate(...) use numexpr, which speeds up computations of massive numpy arrays
-            gammaTimesCorrdNL = ne.evaluate('gammamatrixR1R2 * corrdNL')
+            gammaTimesCorrdNL = ne.evaluate('gammamatrixR1R2 * corrdNL_gs')
 
             if Cosmo_Parameters.second_order_SFRD:
 
-                numerator_NL = ne.evaluate('gammaTimesCorrdNL + (g1 * g1 * (0.5 - g2NL * (1 - corrdNL*corrdNL)) + g2 * g2 * (0.5 - g1NL * (1 - corrdNL*corrdNL))) ')
-                denominator_NL = ne.evaluate('1 - 2 * g1NL - 2 * g2NL + 4 * g1NL * g2NL * (1 - corrdNL*corrdNL)')
+                numerator_NL = ne.evaluate('gammaTimesCorrdNL + g1 * g1 * (0.5 - g2NL * (1 - corrdNL_gs * corrdNL_gs)) + g2 * g2 * (0.5 - g1NL * (1 - corrdNL_gs * corrdNL_gs))')
+                denominator_NL = ne.evaluate('1 - 2 * g1NL - 2 * g2NL + 4 * g1NL * g2NL * (1 - corrdNL_gs * corrdNL_gs)')
                 norm1 = ne.evaluate('exp(g1 * g1 / (2 - 4 * g1NL)) / sqrt(1 - 2 * g1NL)') 
                 norm2 = ne.evaluate('exp(g2 * g2 / (2 - 4 * g2NL)) / sqrt(1 - 2 * g2NL)') 
+                
                 nonlinearcorrelation = ne.evaluate('exp(numerator_NL/denominator_NL) / sqrt(denominator_NL) / norm1 / norm2')
 
+                # use second order in SFRD lognormal approx
                 expGammaCorrMinusLinear = ne.evaluate('nonlinearcorrelation - 1 - gammaTimesCorrdNL')
+
             else:
                 expGammaCorrMinusLinear = ne.evaluate('exp(gammaTimesCorrdNL) - 1 - gammaTimesCorrdNL')
             # --- #
@@ -723,25 +744,34 @@ class Power_Spectra:
 
         # SarahLibanore : change to introduce quantities required in the second order correction
         # --- #
-        gammaR1_II = T21_coefficients.gamma_II_index2D[:, _iRnonlinear] * growthRmatrix
-        gammaR1_III = T21_coefficients.gamma_III_index2D[:, _iRnonlinear] * growthRmatrix
-        g1 = gammaR1_II.reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
-        g2 = gammaR1_III.reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
+        growthRmatrix1 = growthRmatrix.reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
+        growthRmatrix2 = growthRmatrix.reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
+        growth_corr = growthRmatrix1 * growthRmatrix2
+
+        gammaR1_II = T21_coefficients.gamma_II_index2D[:, _iRnonlinear] 
+        sigmaR1_II = np.squeeze(T21_coefficients.sigmaR[:, _iRnonlinear] )
+        gammaR1_III = T21_coefficients.gamma_III_index2D[:, _iRnonlinear] 
+        sigmaR1_III = np.squeeze(T21_coefficients.sigmaR_popIII[:, _iRnonlinear] )
+        
+        g1 = (gammaR1_II * sigmaR1_II).reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
+        sR1 = (sigmaR1_II).reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
+        g2 = (gammaR1_III * sigmaR1_III).reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
+        sR2 = (sigmaR1_III).reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
 
         gammamatrix_R1II_R1III = g1 * g2
 
-        gammaTimesCorrdNL = ne.evaluate('gammamatrix_R1II_R1III * corrdNL') #np.einsum('ijkl,ijkl->ijkl', gammamatrix_R1II_R1III, corrdNL, optimize = True) #same thing as gammamatrixR1R1 * corrdNL but faster
+        gammaTimesCorrdNL = ne.evaluate('gammamatrix_R1II_R1III * corrdNL * growth_corr/ (sR1 * sR2)') #np.einsum('ijkl,ijkl->ijkl', gammamatrix_R1II_R1III, corrdNL, optimize = True) #same thing as gammamatrixR1R1 * corrdNL but faster
         
         if Cosmo_Parameters.second_order_SFRD:
 
             gammaR1NL_II = T21_coefficients.gamma2_II_index2D[:, _iRnonlinear] * pow(growthRmatrix,2)
             gammaR1NL_III = T21_coefficients.gamma2_III_index2D[:, _iRnonlinear] * pow(growthRmatrix,2)
 
-            g1NL = gammaR1NL_II.reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
-            g2NL = gammaR1NL_III.reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
+            g1NL = (gammaR1NL_II * sigmaR1_II**2).reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
+            g2NL = (gammaR1NL_III * sigmaR1_III**2).reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
 
-            numerator_NL = ne.evaluate('gammaTimesCorrdNL + (g1 * g1 * (0.5 - g2NL * (1 - corrdNL*corrdNL)) + g2 * g2 * (0.5 - g1NL * (1 - corrdNL*corrdNL))) ')
-            denominator_NL = ne.evaluate('1 - 2 * g1NL - 2 * g2NL + 4 * g1NL * g2NL * (1 - corrdNL*corrdNL)')
+            numerator_NL = ne.evaluate('gammaTimesCorrdNL + (g1 * g1 * (0.5 - g2NL * (1 - (corrdNL*corrdNL*growth_corr*growth_corr)/ (sR1 * sR2)/ (sR1 * sR2))) + g2 * g2 * (0.5 - g1NL * (1 - (corrdNL*corrdNL*growth_corr*growth_corr)/ (sR1 * sR2)/ (sR1 * sR2)))) ')
+            denominator_NL = ne.evaluate('1 - 2 * g1NL - 2 * g2NL + 4 * g1NL * g2NL * (1 - (corrdNL*corrdNL*growth_corr*growth_corr)/ (sR1 * sR2)/ (sR1 * sR2))')
             norm1 = ne.evaluate('exp(g1 * g1 / (2 - 4 * g1NL)) / sqrt(1 - 2 * g1NL)') 
             norm2 = ne.evaluate('exp(g2 * g2 / (2 - 4 * g2NL)) / sqrt(1 - 2 * g2NL)') 
             nonlinearcorrelation = ne.evaluate('exp(numerator_NL/denominator_NL) / sqrt(denominator_NL) / norm1 / norm2')
@@ -783,23 +813,37 @@ class Power_Spectra:
 
         # SarahLibanore : change to introduce quantities required in the second order correction
         # --- #
+        growthRmatrix1_II_III = growthRmatrix.reshape(*gammaR1_II.shape, 1, 1)
+        growthRmatrix2_II_III = growthRmatrix.reshape(1, 1, *gammaR2_III.shape)
+        growth_corr_II_III = growthRmatrix1_II_III * growthRmatrix2_II_III
+
+        growthRmatrix1_III_II = growthRmatrix.reshape(*gammaR1_III.shape, 1, 1)
+        growthRmatrix2_III_II = growthRmatrix.reshape(1, 1, *gammaR2_II.shape)
+        growth_corr_III_II = growthRmatrix1_III_II * growthRmatrix2_III_II
+
         gammaR2_II = np.copy(gammaR1_II) #already has growth factor in this
+        sigmaR2_II = np.copy(sigmaR1_II) #already has growth factor in this
         gammaR2_III = np.copy(gammaR1_III) #already has growth factor in this
+        sigmaR2_III = np.copy(sigmaR1_III) #already has growth factor in this
 
-        g1_II_III = gammaR1_II.reshape(*gammaR1_II.shape, 1, 1)
-        g2_II_III = gammaR2_III.reshape(1, 1, *gammaR2_III.shape)
+        g1_II_III = (gammaR1_II * sigmaR1_II).reshape(*gammaR1_II.shape, 1, 1)
+        sR1_II_III = (sigmaR1_II).reshape(*gammaR1_II.shape, 1, 1)
+        g2_II_III = (gammaR2_III * sigmaR2_III).reshape(1, 1, *gammaR2_III.shape)
+        sR2_II_III = (sigmaR2_III).reshape(1, 1, *gammaR2_III.shape)
 
-        g1_III_II =  gammaR1_III.reshape(*gammaR1_III.shape, 1, 1)
-        g2_III_II =  gammaR2_II.reshape(1, 1, *gammaR2_II.shape)
+        g1_III_II =  (gammaR1_III * sigmaR1_III).reshape(*gammaR1_III.shape, 1, 1)
+        sR1_III_II =  (sigmaR1_III).reshape(*gammaR1_III.shape, 1, 1)
+        g2_III_II =  (gammaR2_II * sigmaR2_II).reshape(1, 1, *gammaR2_II.shape)
+        sR2_III_II =  (sigmaR2_II).reshape(1, 1, *gammaR2_II.shape)
         if Cosmo_Parameters.second_order_SFRD:
             gammaR2NL_II = np.copy(gammaR1NL_II) #already has growth factor in this
             gammaR2NL_III = np.copy(gammaR1NL_III) #already has growth factor in this
 
-            g1NL_II_III = gammaR1NL_II.reshape(*gammaR1NL_II.shape, 1, 1)
-            g2NL_II_III = gammaR2NL_III.reshape(1, 1, *gammaR2NL_III.shape)
+            g1NL_II_III = (gammaR1NL_II * sigmaR1_II**2).reshape(*gammaR1NL_II.shape, 1, 1)
+            g2NL_II_III = (gammaR2NL_III * sigmaR2_III**2).reshape(1, 1, *gammaR2NL_III.shape)
 
-            g1NL_III_II = 0.# gammaR1NL_III.reshape(*gammaR1NL_III.shape, 1, 1)
-            g2NL_III_II = 0.# gammaR2NL_II.reshape(1, 1, *gammaR2NL_II.shape)
+            g1NL_III_II = (gammaR1NL_III * sigmaR1_III**2).reshape(*gammaR1NL_III.shape, 1, 1)
+            g2NL_III_II = (gammaR2NL_II * sigmaR2_II**2).reshape(1, 1, *gammaR2NL_II.shape)
 
         gammamatrix_R1II_R2III = g1_II_III * g2_II_III
         gammamatrix_R1III_R2II = g1_III_II * g2_III_II
@@ -809,20 +853,20 @@ class Power_Spectra:
             
             #HAC: Computations using ne.evaluate(...) use numexpr, which speeds up computations of massive numpy arrays
 
-            gamma_R1II_R2III_CorrdNL = ne.evaluate('gammamatrix_R1II_R2III * corrdNL')
+            gamma_R1II_R2III_CorrdNL = ne.evaluate('gammamatrix_R1II_R2III * corrdNL * growth_corr_II_III / (sR1_II_III * sR2_II_III)')
 
             if Cosmo_Parameters.second_order_SFRD:
 
-                numerator_NL = ne.evaluate('gamma_R1II_R2III_CorrdNL + (g1_II_III * g1_II_III * (0.5 - g2NL_II_III * (1 - corrdNL*corrdNL)) + g2_II_III * g2_II_III * (0.5 - g1NL_II_III * (1 - corrdNL*corrdNL))) ')
-                denominator_NL = ne.evaluate('1 - 2 * g1NL_II_III - 2 * g2NL_II_III + 4 * g1NL_II_III * g2NL_II_III * (1 - corrdNL*corrdNL)')
+                numerator_NL = ne.evaluate('gamma_R1II_R2III_CorrdNL + (g1_II_III * g1_II_III * (0.5 - g2NL_II_III * (1 - (corrdNL*corrdNL*growth_corr_II_III*growth_corr_II_III)/ (sR1_II_III * sR2_II_III)/ (sR1_II_III * sR2_II_III))) + g2_II_III * g2_II_III * (0.5 - g1NL_II_III * (1 - (corrdNL*corrdNL*growth_corr_II_III*growth_corr_II_III)/ (sR1_II_III * sR2_II_III)/ (sR1_II_III * sR2_II_III)))) ')
+                denominator_NL = ne.evaluate('1 - 2 * g1NL_II_III - 2 * g2NL_II_III + 4 * g1NL_II_III * g2NL_II_III * (1 - (corrdNL*corrdNL*growth_corr_II_III*growth_corr_II_III)/ (sR1_II_III * sR2_II_III)/ (sR1_II_III * sR2_II_III))')
                 norm1 = ne.evaluate('exp(g1_II_III * g1_II_III / (2 - 4 * g1NL_II_III)) / sqrt(1 - 2 * g1NL_II_III)') 
                 norm2 = ne.evaluate('exp(g2_II_III * g2_II_III / (2 - 4 * g2NL_II_III)) / sqrt(1 - 2 * g2NL_II_III)') 
                 nonlinearcorrelation = ne.evaluate('exp(numerator_NL/denominator_NL) / sqrt(denominator_NL) / norm1 / norm2')
 
                 expGamma_R1II_R2III_CorrdNL = ne.evaluate('nonlinearcorrelation - 1 - gamma_R1II_R2III_CorrdNL')
 
-                numerator_NL = ne.evaluate('gammamatrix_R1III_R2II * corrdNL + (g1_III_II * g1_III_II * (0.5 - g2NL_III_II * (1 - corrdNL*corrdNL)) + g2_III_II * g2_III_II * (0.5 - g1NL_III_II * (1 - corrdNL*corrdNL))) ')
-                denominator_NL = ne.evaluate('1 - 2 * g1NL_III_II - 2 * g2NL_III_II + 4 * g1NL_III_II * g2NL_III_II * (1 - corrdNL*corrdNL)')
+                numerator_NL = ne.evaluate('gammamatrix_R1III_R2II * corrdNL*growth_corr_III_II/ (sR1_III_II * sR2_III_II) + (g1_III_II * g1_III_II * (0.5 - g2NL_III_II * (1 - (corrdNL*corrdNL*growth_corr_III_II*growth_corr_III_II)/ (sR1_III_II * sR2_III_II)/ (sR1_III_II * sR2_III_II))) + g2_III_II * g2_III_II * (0.5 - g1NL_III_II * (1 - (corrdNL*corrdNL*growth_corr_III_II*growth_corr_III_II)/ (sR1_III_II * sR2_III_II)/ (sR1_III_II * sR2_III_II)))) ')
+                denominator_NL = ne.evaluate('1 - 2 * g1NL_III_II - 2 * g2NL_III_II + 4 * g1NL_III_II * g2NL_III_II * (1 - (corrdNL*corrdNL*growth_corr_III_II*growth_corr_III_II)/ (sR1_III_II * sR2_III_II)/ (sR1_III_II * sR2_III_II))')
                 norm1 = ne.evaluate('exp(g1_III_II * g1_III_II / (2 - 4 * g1NL_III_II)) / sqrt(1 - 2 * g1NL_III_II)') 
                 norm2 = ne.evaluate('exp(g2_III_II * g2_III_II / (2 - 4 * g2NL_III_II)) / sqrt(1 - 2 * g2NL_III_II)') 
                 nonlinearcorrelation = ne.evaluate('exp(numerator_NL/denominator_NL) / sqrt(denominator_NL) / norm1 / norm2')
@@ -831,7 +875,7 @@ class Power_Spectra:
 
             else:
                 expGamma_R1II_R2III_CorrdNL = ne.evaluate('exp(gamma_R1II_R2III_CorrdNL) - 1 - gamma_R1II_R2III_CorrdNL')
-                gamma_R1III_R2II_CorrdNL = ne.evaluate('gammamatrix_R1III_R2II * corrdNL')
+                gamma_R1III_R2II_CorrdNL = ne.evaluate('gammamatrix_R1III_R2II * corrdNL*growth_corr_III_II/ (sR1_III_II * sR2_III_II)')
 
 
             deltaXiTxAddend = ne.evaluate('coeffsTxALL_R1II_R2III * expGamma_R1II_R2III_CorrdNL + coeffsTxALL_R1III_R2II * expGamma_R1III_R2II_CorrdNL')
@@ -930,21 +974,28 @@ class Power_Spectra:
 
         # SarahLibanore : change to introduce quantities required in the second order correction
         # --- #
-        gammaR1 = T21_coefficients.gamma_III_index2D[:, _iRnonlinear] * growthRmatrix
-        g1 = gammaR1.reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
-        g2 = gammaR1.reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
+        growthRmatrix1 = growthRmatrix.reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
+        growthRmatrix2 = growthRmatrix.reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
+        growth_corr = growthRmatrix1 * growthRmatrix2
+
+        gammaR1 = T21_coefficients.gamma_III_index2D[:, _iRnonlinear] 
+        sigmaR1 = np.squeeze(T21_coefficients.sigmaR_popIII[:, _iRnonlinear])
+        g1 = (gammaR1 * sigmaR1).reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
+        sR1 = (sigmaR1).reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
+        g2 = (gammaR1 * sigmaR1).reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
+        sR2 = (sigmaR1).reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
         gammamatrixR1R1 = g1 * g2 
 
-        gammaCorrdNL = ne.evaluate('gammamatrixR1R1 * corrdNL') #np.einsum('ijkl,ijkl->ijkl', gammamatrixR1R1, corrdNL, optimize = True) #same thing as gammamatrixR1R1 * corrdNL but faster
+        gammaCorrdNL = ne.evaluate('gammamatrixR1R1 * corrdNL * growth_corr/ (sR1 * sR2)') #np.einsum('ijkl,ijkl->ijkl', gammamatrixR1R1, corrdNL, optimize = True) #same thing as gammamatrixR1R1 * corrdNL but faster
 
         if Cosmo_Parameters.second_order_SFRD:
 
-            gammaR1NL = T21_coefficients.gamma2_III_index2D[:, _iRnonlinear] * pow(growthRmatrix,2)
-            g1NL = gammaR1NL.reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
-            g2NL = gammaR1NL.reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
+            gammaR1NL = T21_coefficients.gamma2_III_index2D[:, _iRnonlinear] 
+            g1NL = (gammaR1NL * sigmaR1**2).reshape(len(T21_coefficients.zintegral), 1, len(_iRnonlinear),1)
+            g2NL = (gammaR1NL * sigmaR1**2).reshape(len(T21_coefficients.zintegral), len(_iRnonlinear), 1,1)
 
-            numerator_NL = ne.evaluate('gammaCorrdNL + (g1 * g1 * (0.5 - g2NL * (1 - corrdNL*corrdNL)) + g2 * g2 * (0.5 - g1NL * (1 - corrdNL*corrdNL))) ')
-            denominator_NL = ne.evaluate('1 - 2 * g1NL - 2 * g2NL + 4 * g1NL * g2NL * (1 - corrdNL*corrdNL)')
+            numerator_NL = ne.evaluate('gammaCorrdNL + (g1 * g1 * (0.5 - g2NL * (1 - (corrdNL*corrdNL*growth_corr*growth_corr) / (sR1 * sR2) / (sR1 * sR2))) + g2 * g2 * (0.5 - g1NL * (1 - (corrdNL*corrdNL*growth_corr*growth_corr) / (sR1 * sR2) / (sR1 * sR2)))) ')
+            denominator_NL = ne.evaluate('1 - 2 * g1NL - 2 * g2NL + 4 * g1NL * g2NL * (1 - (corrdNL*corrdNL*growth_corr*growth_corr) / (sR1 * sR2) / (sR1 * sR2))')
             norm1 = ne.evaluate('exp(g1 * g1 / (2 - 4 * g1NL)) / sqrt(1 - 2 * g1NL)') 
             norm2 = ne.evaluate('exp(g2 * g2 / (2 - 4 * g2NL)) / sqrt(1 - 2 * g2NL)') 
             nonlinearcorrelation = ne.evaluate('exp(numerator_NL/denominator_NL) / sqrt(denominator_NL) / norm1 / norm2')
@@ -994,26 +1045,33 @@ class Power_Spectra:
 
         # SarahLibanore : change to introduce quantities required in the second order correction
         # --- #
+        growthRmatrix1 = growthRmatrix.reshape(*gammaR1.shape, 1, 1)
+        growthRmatrix2 = growthRmatrix.reshape(1, 1, *gammaR2.shape)
+        growth_corr = growthRmatrix1 * growthRmatrix2
+
         gammaR2 = np.copy(gammaR1) #already has growth factor in this
-        g1 = gammaR1.reshape(*gammaR1.shape, 1, 1)
-        g2 = gammaR2.reshape(1, 1, *gammaR2.shape)
+        sigmaR2 = np.copy(sigmaR1) #already has growth factor in this
+        g1 = (gammaR1 * sigmaR1).reshape(*gammaR1.shape, 1, 1)
+        sR1 = (sigmaR1).reshape(*gammaR1.shape, 1, 1)
+        g2 = (gammaR2 * sigmaR2).reshape(1, 1, *gammaR2.shape)
+        sR2 = (sigmaR2).reshape(1, 1, *gammaR2.shape)
         gammamatrixR1R2 = g1 * g2
 
         if Cosmo_Parameters.second_order_SFRD:
             gammaR2NL = np.copy(gammaR1NL) #already has growth factor in this
-            g1NL = gammaR1NL.reshape(*gammaR1NL.shape, 1, 1)
-            g2NL = gammaR2NL.reshape(1, 1, *gammaR2NL.shape)
+            g1NL = (gammaR1NL * sigmaR1**2).reshape(*gammaR1NL.shape, 1, 1)
+            g2NL = (gammaR2NL * sigmaR2**2).reshape(1, 1, *gammaR2NL.shape)
 
         for ir in range(len(T21_coefficients.Rtabsmoo)):
             corrdNL = corrdNLBIG[:,:,:,:,ir]
             corrEtaNL = corrEtaNLBIG[:,:,:,:,ir]
 
-            gammaCorrdNL = ne.evaluate('gammamatrixR1R2 * corrdNL')
+            gammaCorrdNL = ne.evaluate('gammamatrixR1R2 * corrdNL * growth_corr/ (sR1 * sR2)')
 
             if Cosmo_Parameters.second_order_SFRD:
 
-                numerator_NL = ne.evaluate('gammaCorrdNL + (g1 * g1 * (0.5 - g2NL * (1 - corrdNL*corrdNL)) + g2 * g2 * (0.5 - g1NL * (1 - corrdNL*corrdNL))) ')
-                denominator_NL = ne.evaluate('1 - 2 * g1NL - 2 * g2NL + 4 * g1NL * g2NL * (1 - corrdNL*corrdNL)')
+                numerator_NL = ne.evaluate('gammaCorrdNL + (g1 * g1 * (0.5 - g2NL * (1 - (corrdNL*corrdNL*growth_corr*growth_corr)/ (sR1 * sR2)/ (sR1 * sR2))) + g2 * g2 * (0.5 - g1NL * (1 - (corrdNL*corrdNL*growth_corr*growth_corr)/ (sR1 * sR2)/ (sR1 * sR2)))) ')
+                denominator_NL = ne.evaluate('1 - 2 * g1NL - 2 * g2NL + 4 * g1NL * g2NL * (1 -( corrdNL*corrdNL*growth_corr*growth_corr)/ (sR1 * sR2)/ (sR1 * sR2))')
                 norm1 = ne.evaluate('exp(g1 * g1 / (2 - 4 * g1NL)) / sqrt(1 - 2 * g1NL)') 
                 norm2 = ne.evaluate('exp(g2 * g2 / (2 - 4 * g2NL)) / sqrt(1 - 2 * g2NL)') 
                 nonlinearcorrelation = ne.evaluate('exp(numerator_NL/denominator_NL) / sqrt(denominator_NL) / norm1 / norm2')

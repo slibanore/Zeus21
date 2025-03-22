@@ -21,7 +21,7 @@ FLAG_FORCE_LINEAR_CF = 0 #0 to do standard calculation, 1 to force linearization
 MIN_R_NONLINEAR = 2.0 #minimum radius R/cMpc in which we start doing the nonlinear calculation. Below ~1 it will blow up because sigma > 1 eventually, and our exp(\delta) approximation breaks. Check if you play with it and if you change Window().
 MAX_R_NONLINEAR = 100.0 #max radius R/cMpc in which we start doing the nonlinear calculation. Above this it is very linear
 
-FLAG_DO_DENS_NL = True #whether to do the nonlinear (ie lognormal) calculation for the density field itself and its cross correlations. Small (<3%) correction in dd, but non trivial (~10%) in d-xa and d-Tx
+FLAG_DO_DENS_NL = False #whether to do the nonlinear (ie lognormal) calculation for the density field itself and its cross correlations. Small (<3%) correction in dd, but non trivial (~10%) in d-xa and d-Tx
 
 FLAG_WF_ITERATIVE = True #whether to iteratively do the WF correction as in Hirata2006.
 
