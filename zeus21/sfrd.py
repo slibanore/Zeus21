@@ -194,13 +194,13 @@ class get_T21_coefficients:
 
         whereNotNans = np.invert(np.isnan(rGreaterArray))
 
-        self.sigmaR = np.zeros((len(self.zintegral), len(self.Rtabsmoo), 1, 1))
-        self.sigmaR[whereNotNans] = HMF_interpolator.sigmaRintlog((np.log(rGreaterArray)[whereNotNans], zGreaterArray[whereNotNans]))
+        sigmaR = np.zeros((len(self.zintegral), len(self.Rtabsmoo), 1, 1))
+        sigmaR[whereNotNans] = HMF_interpolator.sigmaRintlog((np.log(rGreaterArray)[whereNotNans], zGreaterArray[whereNotNans]))
 
         sigmaM = np.zeros((len(self.zintegral), len(self.Rtabsmoo), len(HMF_interpolator.Mhtab), 1)) ###HAC: Is this necessary?
         sigmaM = HMF_interpolator.sigmaintlog((np.log(mArray), zGreaterArray))
 
-        modSigmaSq = sigmaM**2 - self.sigmaR**2
+        modSigmaSq = sigmaM**2 - sigmaR**2
         indexTooBig = (modSigmaSq <= 0.0)
         modSigmaSq[indexTooBig] = np.inf #if sigmaR > sigmaM the halo does not fit in the radius R. Cut the sum
         modSigma = np.sqrt(modSigmaSq)
@@ -211,8 +211,7 @@ class get_T21_coefficients:
         dsigmadMcurr = HMF_interpolator.dsigmadMintlog((np.log(mArray),zGreaterArray)) ###HAC: Check this works when emulating 21cmFAST
         dlogSdMcurr = (dsigmadMcurr*sigmaM*2.0)/(modSigmaSq)
 
-        # SarahLibanore: make it callable from outside
-        deltaArray = deltaNormArray * self.sigmaR
+        deltaArray = deltaNormArray * sigmaR
         # sMax = 0.3
         # deltaArray[Nsigmad * sigmaR > 1.0] = deltaNormArray * sMax
 
@@ -315,8 +314,6 @@ class get_T21_coefficients:
 
                 zArray, rArray, mArray, velArray = np.meshgrid(self.zintegral, self.Rtabsmoo, HMF_interpolator.Mhtab, vAvg_array, indexing = 'ij', sparse = True)
 
-                # SarahLibanore: this is the same as in the previous definition of sigmaR, is this needed?
-                # if it is the same, just set sigmaR_popIII equal to sigmaR (and same for sigmaM)
                 rGreaterArray = np.zeros_like(zArray) + rArray
 
                 rGreaterArray[Cosmo_Parameters.chiofzint(zArray) + rArray >= Cosmo_Parameters.chiofzint(50)] = np.nan
@@ -324,13 +321,13 @@ class get_T21_coefficients:
 
                 whereNotNans = np.invert(np.isnan(rGreaterArray))
 
-                self.sigmaR_popIII = np.zeros((len(self.zintegral), len(self.Rtabsmoo), 1, 1))
-                self.sigmaR_popIII[whereNotNans] = HMF_interpolator.sigmaRintlog((np.log(rGreaterArray)[whereNotNans], zGreaterArray[whereNotNans]))
+                sigmaR_popIII = np.zeros((len(self.zintegral), len(self.Rtabsmoo), 1, 1))
+                sigmaR_popIII[whereNotNans] = HMF_interpolator.sigmaRintlog((np.log(rGreaterArray)[whereNotNans], zGreaterArray[whereNotNans]))
 
                 sigmaM = np.zeros((len(self.zintegral), len(self.Rtabsmoo), len(HMF_interpolator.Mhtab), 1)) ###HAC: Is this necessary?
                 sigmaM = HMF_interpolator.sigmaintlog((np.log(mArray), zGreaterArray))
 
-                modSigmaSq = sigmaM**2 - self.sigmaR_popIII**2
+                modSigmaSq = sigmaM**2 - sigmaR_popIII**2
                 indexTooBig = (modSigmaSq <= 0.0)
                 modSigmaSq[indexTooBig] = np.inf #if sigmaR > sigmaM the halo does not fit in the radius R. Cut the sum
                 modSigma = np.sqrt(modSigmaSq)
@@ -341,7 +338,7 @@ class get_T21_coefficients:
                 dsigmadMcurr = HMF_interpolator.dsigmadMintlog((np.log(mArray),zGreaterArray)) ###HAC: Check this works when emulating 21cmFAST
                 dlogSdMcurr = (dsigmadMcurr*sigmaM*2.0)/(modSigmaSq)
 
-                deltaZero = np.zeros_like(self.sigmaR_popIII)
+                deltaZero = np.zeros_like(sigmaR_popIII)
                 # sMax = 0.3
                 # deltaArray[Nsigmad * sigmaR > 1.0] = deltaNormArray * sMax
 
@@ -528,7 +525,9 @@ class get_T21_coefficients:
         #correct for nonlinearities in <(1+d)SFRD>, only if doing nonlinear stuff. We're assuming that (1+d)SFRD ~ exp(gamma*d), so the "Lagrangian" gamma was gamma-1. We're using the fact that for a lognormal variable X = log(Z), with  Z=\gamma \delta, <X> = exp(\gamma^2 \sigma^2/2).
 
         if(constants.C2_RENORMALIZATION_FLAG==True):
+
             _corrfactorEulerian_II = 1.0 + (self.gamma_II_index2D-1.0)*self.sigmaofRtab**2
+
             _corrfactorEulerian_II=_corrfactorEulerian_II.T
             _corrfactorEulerian_II[0:Cosmo_Parameters.indexminNL] = _corrfactorEulerian_II[Cosmo_Parameters.indexminNL] #for R<R_NL we just fix it to the RNL value, as we do for the correlation function. We could cut the sum but this keeps those scales albeit approximately
             self.coeff2LyAzpRR_II*= _corrfactorEulerian_II.T
@@ -539,7 +538,7 @@ class get_T21_coefficients:
                 _corrfactorEulerian_III[0:Cosmo_Parameters.indexminNL] = _corrfactorEulerian_III[Cosmo_Parameters.indexminNL] #for R<R_NL we just fix it to the RNL value, as we do for the correlation function. We could cut the sum but this keeps those scales albeit approximately
                 self.coeff2LyAzpRR_III*= _corrfactorEulerian_III.T
                 self.coeff2XzpRR_III*= _corrfactorEulerian_III.T
-        ## alternative expression below: if you take (1+d)~exp(d) throughout.
+        # ## alternative expression below: if you take (1+d)~exp(d) throughout.
         #self.coeff2LyAzpRR *= np.exp(self.sigmaofRtab**2/2.0 * (2.0 *self.gamma_index2D-1.0) )
         #self.coeff2XzpRR *= np.exp(self.sigmaofRtab**2/2.0 * (2.0 *self.gamma_index2D-1.0) )
         
@@ -850,7 +849,6 @@ def SFR_II(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, massVector, z, 
     fstarM = np.fmin(fstarM, Astro_Parameters.fstarmax)
     
     # Sarah Libanore: add stochasticity in the SFR-M* and M*-Mh relations
-
     SFR_det = dMh_dt(Astro_Parameters, Cosmo_Parameters, HMF_interpolator, Mh, z)  * fstarM * fduty
 
     # SarahLibanore : introduced the possibility to add stochasticity in stellar M and SFR in the computation of the average SFRD (no extra fluctuations)

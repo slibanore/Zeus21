@@ -268,6 +268,7 @@ def make_ion_fields(CosmoParams, AstroParams, CoeffStructure, ClassyCosmo, CorrF
         print('WARNING: FLAG_return_densities is not set to (0, 1, or 2). Defaulting to 0.')
         return ion_fields, ion_frac, xHI_map
 
+
 #look over this again
 def ionize(CosmoParams, zlist, Rs, curr_z_idx, smooth_density_fields, barrier, r_idx, klist3Dfft, spherize):
 

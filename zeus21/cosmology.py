@@ -247,14 +247,8 @@ class HMF_interpolator:
             self.sigmaMhtab*=_offsetgrowthdicke21cmFAST
             self.dsigmadMMhtab*=_offsetgrowthdicke21cmFAST
             #Note that these two changes may be different if away from Planck2018
-
-
-
+            
         self.HMFtab = np.zeros_like(self.sigmaMhtab)
-
-
-
-
 
         for iM, MM in enumerate(self.Mhtab):
             for iz, zz in enumerate(self.zHMFtab):

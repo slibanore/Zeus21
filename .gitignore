@@ -136,3 +136,4 @@ dmypy.json
 *.png
 plots
 boxes_*
+nonlinear_algebra*

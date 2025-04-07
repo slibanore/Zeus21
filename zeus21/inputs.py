@@ -21,7 +21,7 @@ class Cosmo_Parameters_Input:
 
     def __init__(self, omegab= 0.0223828, omegac = 0.1201075, h_fid = 0.67810, As = 2.100549e-09, ns = 0.9660499, 
                  tau_fid = 0.05430842, kmax_CLASS = 500., zmax_CLASS = 50.,zmin_CLASS = 5., Flag_emulate_21cmfast = False, 
-                 USE_RELATIVE_VELOCITIES = False, HMF_CHOICE= "ST", second_order_SFRD = False): # SarahLibanore
+                 USE_RELATIVE_VELOCITIES = False, HMF_CHOICE= "ST"): 
 
         self.omegab = omegab
         self.omegac = omegac
@@ -43,9 +43,6 @@ class Cosmo_Parameters_Input:
         #which HMF we use
         self.HMF_CHOICE = HMF_CHOICE #which HMF functional form we use.
         #options are "ST" the classic  Sheth-Tormen (f(nu)), "Yung" for the Tinker08 (f(sigma)) calibrated to Yung+23. Default ST
-
-        # SarahLibanore: second order correction to SFRD
-        self.second_order_SFRD = second_order_SFRD
 
 
 class Cosmo_Parameters:
@@ -157,8 +154,6 @@ class Cosmo_Parameters:
         else:
             print("Error! Have to set either Flag_emulate_21cmfast = True or False")
 
-        # SarahLibanore: second order correction to SFRD
-        self.second_order_SFRD = CosmoParams_input.second_order_SFRD
 
 class Astro_Parameters:
     "Class to pass the astro parameters as input"
@@ -211,10 +206,17 @@ class Astro_Parameters:
                     A_vcb = 1.0,
                     beta_vcb = 1.8,
                  
+                    # Sarah Libanore: add possibility of using the second order in the lognormal SFRD approximation
+                    second_order_SFRD = False,
+                    
                     # Sarah Libanore: add stochasticity in the SFR-M* and M*-Mh relations
                     STOCHASTICITY = False,
+                    
                 ):
 
+
+        # SarahLibanore: second order correction to SFRD
+        self.second_order_SFRD = second_order_SFRD
 
         # Sarah Libanore: add stochasticity in the SFR-M* and M*-Mh relations
         self.STOCHASTICITY = STOCHASTICITY
