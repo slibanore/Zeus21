@@ -114,6 +114,7 @@ class CoevalMaps:
             print('ERROR, KIND not implemented yet!')
 
 
+# SarahLibanore: from Yonni's version
 def make_ion_fields(CosmoParams, AstroParams, CoeffStructure, ClassyCosmo, CorrFClass, BMF, input_z, boxlength=300., ncells=300, seed=1234, r_precision=1., timer=True, logd = False, barrier = None, spherize=False, FLAG_return_densities = 0):
     """
     Generates a 3D map of ionized fields and ionized fraction of hydrogen.
@@ -269,7 +270,7 @@ def make_ion_fields(CosmoParams, AstroParams, CoeffStructure, ClassyCosmo, CorrF
         return ion_fields, ion_frac, xHI_map
 
 
-#look over this again
+# SarahLibanore: from Yonni's version
 def ionize(CosmoParams, zlist, Rs, curr_z_idx, smooth_density_fields, barrier, r_idx, klist3Dfft, spherize):
 
     Dg0 = CosmoParams.growthint(zlist[0])
