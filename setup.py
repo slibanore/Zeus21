@@ -14,12 +14,11 @@ setup(
           packages=['oLIMpus','zeus21'],
           long_description=open('README.md').read(),
           install_requires=[
-           "numpy",
-           "scipy",
            "mcfit",
            "classy",
            "numexpr",
            "astropy",
-           "zeus21"
+           "pyfftw",
+           "powerbox",
        ],
 )
