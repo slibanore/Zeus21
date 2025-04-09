@@ -180,6 +180,29 @@ def ST_HMF(Cosmo_Parameters, Mass, sigmaM, dsigmadM):
     return -A_ST * np.sqrt(2./np.pi) * nutilde * (1. + nutilde**(-2.0*p_ST)) * np.exp(-nutilde**2/2.0) * (Cosmo_Parameters.rho_M0 / (Mass * sigmaM)) * dsigmadM
 
 
+# SarahLibanore 
+def Tinker08_HMF(Cosmo_Parameters, Mass, sigmaM, dsigmadM,z):
+
+    '''
+    Tinker et al 2008 halo mass function for delta=200
+    '''
+    delta = 200
+    alpha=10**(-(0.75/np.log10(delta/75.0))**1.2)
+
+    # this is for R200_critical with OmegaM=0.2708
+    D=200.0
+    A=0.186*(1.0+z)**(-0.14)
+    a=1.47*(1.0+z)**(-0.06)
+    b=2.57*(1.0+z)**(-alpha)
+    c=1.19
+
+    fs = A*((b/sigmaM)**(a)+1.0)*np.exp(-c/sigmaM**2)
+    
+    dndM = -(Cosmo_Parameters.rho_M0/Mass)*dsigmadM*fs/sigmaM
+
+    return 
+
+
 def Tink_HMF(Cosmo_Parameters, Mass, sigmaM, dsigmadM,z):
     #Tinker08 form of the HMF. All in physical (no h) units. Form from App.A of Yung+23 (2309.14408)
     f = f_GUREFT_physical(sigmaM,z)
@@ -259,6 +282,9 @@ class HMF_interpolator:
                     self.HMFtab[iM,iz] = ST_HMF(Cosmo_Parameters, MM, sigmaM, dsigmadM)
                 elif(Cosmo_Parameters.HMF_CHOICE == 'Yung'):
                     self.HMFtab[iM,iz] = Tink_HMF(Cosmo_Parameters, MM, sigmaM, dsigmadM,zz)
+                # SarahLibanore
+                elif(Cosmo_Parameters.HMF_CHOICE == 'Tinker08_HMF'):
+                    self.HMFtab[iM,iz] = Tinker08_HMF(Cosmo_Parameters, MM, sigmaM, dsigmadM,zz)
                 else:
                     print('ERROR, use a correct Cosmo_Parameters.HMF_CHOICE')
                     self.HMFtab[iM,iz] = 0.0
