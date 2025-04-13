@@ -25,7 +25,7 @@ class CoevalBox_LIM_zeuslike:
     "Class that calculates and keeps coeval maps, one z at a time."
     "The computation is done analytically based on the estimated density and LIM power spectra"
 
-    def __init__(self, LIM_coefficients, Power_Spectrum_LIM, Power_Spectrum, z, Lbox=600, Nbox=200, KIND=None, seed=1605):
+    def __init__(self, LIM_coefficients, LIM_correlation, Power_Spectrum_LIM, z, Lbox=600, Nbox=200, KIND=None, seed=1605):
         'the KIND flag determines the kind of map you make. Options are:'
         'KIND = 0, only LIM lognormal. OK approximation'
 
@@ -59,7 +59,8 @@ class CoevalBox_LIM_zeuslike:
 
         elif (KIND == 1):
 
-            Pd = Power_Spectrum.Deltasq_d_lin[_iz,:]/k3over2pi2
+            Pd = np.outer(Power_Spectrum_LIM._lingrowthd**2, LIM_correlation._PklinCF) [_iz,:]
+
             Pdinterp = interp1d(klist,Pd,fill_value=0.0,bounds_error=False)
 
             pb = pbox.PowerBox(
@@ -73,8 +74,8 @@ class CoevalBox_LIM_zeuslike:
             self.deltamap = pb.delta_x() #density map, basis of this KIND of approach
 
             #then we make a map of the linear LIM fluctuation
-            PdLIM = Power_Spectrum_LIM.Deltasq_dLIM[_iz]/k3over2pi2
-
+            PdLIM = Power_Spectrum_LIM._Pk_deltaLIM[_iz]
+            
             powerratioint = interp1d(klist,PdLIM/Pd,fill_value=0.0,bounds_error=False)
 
             deltak = pb.delta_k()
@@ -107,7 +108,7 @@ class CoevalBoxes_percell:
 
     "We produce a density map, transform each cell to SFRD "
 
-    def __init__(self, LIM_coefficients, Power_Spectrum_LIM, Power_Spectrum, z, LineParams, AstroParams, HMFintclass, CosmoParams, Lbox=600, Nbox=200, seed=1605):
+    def __init__(self, which_SFRD, LIM_coefficients, LIM_correlations, Power_Spectrum_LIM, Zeus_coefficients, z, LineParams, AstroParams, HMFintclass, CosmoParams, Lbox=600, Nbox=200, seed=1605):
 
         zlist = LIM_coefficients.zintegral 
         _iz = min(range(len(zlist)), key=lambda i: np.abs(zlist[i]-z)) #pick closest z
@@ -117,7 +118,7 @@ class CoevalBoxes_percell:
         self.seed = seed
         self.z = zlist[_iz] #will be slightly different from z input
 
-        analytical_box = CoevalBox_LIM_zeuslike(LIM_coefficients=LIM_coefficients, Power_Spectrum_LIM=Power_Spectrum_LIM, Power_Spectrum=Power_Spectrum, z=z, Lbox=Lbox, Nbox=Nbox, KIND=1, seed=seed)
+        analytical_box = CoevalBox_LIM_zeuslike(LIM_coefficients=LIM_coefficients, LIM_correlation=LIM_correlations, Power_Spectrum_LIM=Power_Spectrum_LIM, z=z, Lbox=Lbox, Nbox=Nbox, KIND=1, seed=seed)
 
         delta_box = analytical_box.deltamap
         
@@ -141,18 +142,33 @@ class CoevalBoxes_percell:
 
         EPS_HMF_corr = (nu/nu0) * (sigmaM/modSigma)**2.0 * np.exp(-CosmoParams.a_corr_EPS * (nu**2-nu0**2)/2.0 ) * (1.0 + deltaArray_Mh)
 
-        HMF_curr = np.exp(HMFintclass.logHMFint((np.log(mArray),z)))
-        SFRtab_currII = sfrd.SFR_II(AstroParams, CosmoParams, HMFintclass, mArray, z, 0.)
+        if which_SFRD == 'full':
+            HMF_curr = np.exp(HMFintclass.logHMFint((np.log(mArray),z)))
+            SFRtab_currII = sfrd.SFR_II(AstroParams, CosmoParams, HMFintclass, mArray, z, 0.)
 
-        integrand = EPS_HMF_corr *  HMF_curr * SFRtab_currII * HMFintclass.Mhtab[:,np.newaxis]
+            integrand = EPS_HMF_corr *  HMF_curr * SFRtab_currII * HMFintclass.Mhtab[:,np.newaxis]
 
-        integrand_LIM = EPS_HMF_corr *  HMF_curr * LineLuminosity(SFRtab_currII, LineParams, AstroParams, CosmoParams, HMFintclass, mArray, z)  * HMFintclass.Mhtab[:,np.newaxis]
+            integrand_LIM = EPS_HMF_corr *  HMF_curr * LineLuminosity(SFRtab_currII, LineParams, AstroParams, CosmoParams, HMFintclass, mArray, z)  * HMFintclass.Mhtab[:,np.newaxis]
 
-        SFRDbox_flattend = np.trapezoid(integrand, HMFintclass.logtabMh, axis = 0) 
+            SFRDbox_flattend = np.trapezoid(integrand, HMFintclass.logtabMh, axis = 0) 
+
+            rhoLbox_flattened = np.trapezoid(integrand_LIM,HMFintclass.logtabMh, axis = 0)
+
+        elif which_SFRD == 'approx':
+            if AstroParams.second_order_SFRD:
+                SFRDbox_flattend = Zeus_coefficients.np.exp(Zeus_coefficients.gamma_II_index2D*deltaArray + Zeus_coefficients.gamma2_II_index2D*deltaArray**2)
+            else:
+                SFRDbox_flattend = np.exp(Zeus_coefficients.gamma_II_index2D*deltaArray) 
+
+            SFRDbox_flattend *= Zeus_coefficients.SFRDbar2D_II
+
+            # ?????????
+            #rhoLbox_flattened = SFRDbox_flattend * ??? LineLuminosity
+
+    #        integrand_LIM = EPS_HMF_corr *  HMF_curr * LineLuminosity(SFRtab_currII, LineParams, AstroParams, CosmoParams, HMFintclass, mArray, z)  * HMFintclass.Mhtab[:,np.newaxis]
+
 
         self.SFRD_box = SFRDbox_flattend.reshape(Nbox,Nbox,Nbox)
-
-        rhoLbox_flattened = np.trapezoid(integrand_LIM,HMFintclass.logtabMh, axis = 0)
 
         rhoL_box = rhoLbox_flattened.reshape(Nbox,Nbox,Nbox)
 
@@ -217,21 +233,21 @@ def build_lightcone(which_lightcone,
             correlations = Correlations_LIM(LineParams, CosmoParams, ClassyCosmo)
             coefficients = get_LIM_coefficients(CosmoParams,  AstroParams, HMFintclass, LineParams, zmin=ZMIN)
 
-            PSLIM = Power_Spectra_LIM(CosmoParams, AstroParams, LineParams, correlations, 'here we will put 21cm coeffs', coefficients, RSD_MODE = RSDMODE)
+            PSLIM = Power_Spectra_LIM(CosmoParams, AstroParams, LineParams, correlations, coefficients, RSD_MODE = RSDMODE)
 
             if which_lightcone == 'LIM':
 
                 if analytical:
-                    box.append(CoevalBox_LIM_zeuslike(coefficients,PSLIM,PS21,zi,Lbox,Ncell,1,seed).LIMmap)
+                    box.append(CoevalBox_LIM_zeuslike(LIM_coefficients=coefficients, LIM_correlation=correlations, Power_Spectrum_LIM=PSLIM, z=zi, Lbox=Lbox, Nbox=Ncell, KIND=1, seed=seed).LIMmap)
 
                 else:
-                    box.append(CoevalBoxes_percell(coefficients,PSLIM,PS21,zi,LineParams,AstroParams,HMFintclass,CosmoParams,Lbox,Ncell,seed).Inu_box)
+                    box.append(CoevalBoxes_percell('full',coefficients,correlations,PSLIM,coefficients_21,zi,LineParams,AstroParams,HMFintclass,CosmoParams,Lbox,Ncell,seed).Inu_box)
 
             elif which_lightcone == 'SFRD':
                     if analytical and zi == zvals[0]:
                         print('Warning! The SFRD map cannot be computed analytically')
 
-                    box.append(CoevalBoxes_percell(coefficients,PSLIM,PS21,zi,LineParams,AstroParams,HMFintclass,CosmoParams,Lbox,Ncell,seed).SFRD_box)
+                    box.append(CoevalBoxes_percell('full',coefficients,correlations,PSLIM,coefficients_21,zi,LineParams,AstroParams,HMFintclass,CosmoParams,Lbox,Ncell,seed).SFRD_box)
     
             else:
                 print('Check lightcone')

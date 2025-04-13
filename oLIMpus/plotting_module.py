@@ -7,7 +7,7 @@ from matplotlib.cm import get_cmap
 from matplotlib import colors as cc 
 import matplotlib.cm as cm
 from matplotlib.colors import LogNorm
-from .maps_LIM import build_lightcone, CoevalBox_LIM_zeuslike, CoevalBoxes_percell
+from oLIMpus.maps_LIM import build_lightcone, CoevalBox_LIM_zeuslike, CoevalBoxes_percell
 
 
 plt.rcParams.update({"text.usetex": True, "font.family": "Times new roman"}) # Use latex fonts
@@ -129,7 +129,7 @@ def plot_Inu(z,
     correlations = oLIMpus.Correlations_LIM(LineParams, CosmoParams, ClassyCosmo)
     coefficients = oLIMpus.get_LIM_coefficients(CosmoParams,  AstroParams, HMFintclass, LineParams, zmin=ZMIN)
 
-    PSLIM = oLIMpus.Power_Spectra_LIM(CosmoParams, AstroParams, LineParams, correlations, 'here we will put 21cm coeffs', coefficients, RSD_MODE = RSDMODE)
+    PSLIM = oLIMpus.Power_Spectra_LIM(CosmoParams, AstroParams, LineParams, correlations, coefficients, RSD_MODE = RSDMODE)
 
     correlations_21 = oLIMpus.Correlations(CosmoParams, ClassyCosmo)   
     coefficients_21 = oLIMpus.get_T21_coefficients(CosmoParams, ClassyCosmo, AstroParams, HMFintclass, zmin=ZMIN)
@@ -137,11 +137,11 @@ def plot_Inu(z,
     PS21 = oLIMpus.Power_Spectra(CosmoParams, AstroParams, ClassyCosmo, correlations_21, coefficients_21, RSD_MODE = RSDMODE)
 
     if analytical:
-        Maps_line = CoevalBox_LIM_zeuslike(coefficients,PSLIM,PS21,z,Lbox,Ncell,1,seed)
+        Maps_line = CoevalBox_LIM_zeuslike(coefficients,correlations,PSLIM,z,Lbox,Ncell,1,seed)
         coeval_slice_line = Maps_line.LIMmap[_islice]
 
     else:
-        Maps_line = CoevalBoxes_percell(coefficients,PSLIM,PS21,z,LineParams,AstroParams,HMFintclass,CosmoParams,Lbox,Ncell,seed)
+        Maps_line = CoevalBoxes_percell('full',coefficients,correlations,PSLIM,correlations_21,z,LineParams,AstroParams,HMFintclass,CosmoParams,Lbox,Ncell,seed)
         coeval_slice_line = Maps_line.Inu_box[_islice]
 
     if ax is None or fig is None:
@@ -219,7 +219,7 @@ def plot_lightcone(which_lightcone,
         vmin = -0.6
         vmax = 0.6
     elif which_lightcone == 'SFRD':
-        text_label_helper = r'$\rm SFRD$'
+        text_label_helper = r'$\rm SFRD\,[M_\odot/{\rm (yr Mpc^{-3})}}]$'
         use_cmap = 'bwr'
         vmin = 1e-5
         vmax = 1e-1
@@ -229,12 +229,12 @@ def plot_lightcone(which_lightcone,
         vmin = 0.
         vmax = 1.
     elif which_lightcone == 'T21':
-        text_label_helper = r'$T_{21}$'
+        text_label_helper = r'$T_{21}\,[{\mu\rm K}]$'
         use_cmap = eor_colour
         vmin = min_value
         vmax = max_value
     elif which_lightcone == 'LIM':
-        text_label_helper = r'$I_{%s}$'%LineParams.LINE
+        text_label_helper = r'$I_{%s}\,[{\rm Jy/sr}]$'%LineParams.LINE
         use_cmap = LIM_colour_1
         vmin = np.min(lightcone)
         vmax = np.max(lightcone)
