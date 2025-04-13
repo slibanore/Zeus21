@@ -21,7 +21,8 @@ class Cosmo_Parameters_Input:
 
     def __init__(self, omegab= 0.0223828, omegac = 0.1201075, h_fid = 0.67810, As = 2.100549e-09, ns = 0.9660499, 
                  tau_fid = 0.05430842, kmax_CLASS = 500., zmax_CLASS = 50.,zmin_CLASS = 5., Flag_emulate_21cmfast = False, 
-                 USE_RELATIVE_VELOCITIES = False, HMF_CHOICE= "ST"): 
+                 USE_RELATIVE_VELOCITIES = False, HMF_CHOICE= "ST",
+                 Rsmmin = 0.5): # SarahLibanore
 
         self.omegab = omegab
         self.omegac = omegac
@@ -43,7 +44,7 @@ class Cosmo_Parameters_Input:
         #which HMF we use
         self.HMF_CHOICE = HMF_CHOICE #which HMF functional form we use.
         #options are "ST" the classic  Sheth-Tormen (f(nu)), "Yung" for the Tinker08 (f(sigma)) calibrated to Yung+23. Default ST
-
+        self.Rsmmin = Rsmmin
 
 class Cosmo_Parameters:
     "Class that will keep the cosmo parameters throughout"
@@ -120,7 +121,7 @@ class Cosmo_Parameters:
 
 
         #and define the shells that we integrate over at each z.
-        self.Rsmmin = 0.5
+        self.Rsmmin = CosmoParams_input.Rsmmin # 0.5
         self.Rsmmax = 2000.
 
         if(self.Flag_emulate_21cmfast==True):

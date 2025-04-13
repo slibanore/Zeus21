@@ -9,7 +9,7 @@ class LineParams_Input:
     def __init__ (self, 
                  LINE = 'CII',
                  nu_rest = 1.897e12, 
-                 OBSERVABLE_LIM = 'Tnu',
+                 OBSERVABLE_LIM = 'Inu',
                  _R = 3, # for now we consider radius larger than NL level 
                  LINE_MODEL = 'Lagache18',
                  sigma_LSFR = 0.,
@@ -57,7 +57,7 @@ class Line_Parameters:
 Lagache_CII_params = {
         'LINE': 'CII',
         'nu_rest': 1.897e12, 
-        'OBSERVABLE_LIM': 'Tnu',
+        'OBSERVABLE_LIM': 'Inu',
         '_R ': 3, 
         'LINE_MODEL': 'Lagache18',
         'alpha_SFR_0': 1.4-0.07*10,
@@ -70,7 +70,7 @@ Lagache_CII_params = {
 Yang_OIII_params = [{
         'LINE': 'OIII',
         'nu_rest': 6.042e14, # 4960 AA, 5007 AA # multi line available
-        'OBSERVABLE_LIM': 'Tnu',
+        'OBSERVABLE_LIM': 'Inu',
         '_R ': 3, 
         'LINE_MODEL': 'Yang24', # 2409.03997
         'alpha_SFR_0': 9.82e-2,
@@ -82,7 +82,7 @@ Yang_OIII_params = [{
     {
         'LINE': 'OIII',
         'nu_rest': 5.985e14, # 4960 AA, 5007 AA # multi line available
-        'OBSERVABLE_LIM': 'Tnu',
+        'OBSERVABLE_LIM': 'Inu',
         '_R ': 3, 
         'LINE_MODEL': 'Yang24', # 2409.03997
         'alpha_SFR_0': 9.83e-2,
@@ -95,7 +95,7 @@ Yang_OIII_params = [{
 Yang_OII_params = {
         'LINE': 'OII',
         'nu_rest': 8.05e14, # 3727 AA 
-        'OBSERVABLE_LIM': 'Tnu',
+        'OBSERVABLE_LIM': 'Inu',
         '_R ': 3, 
         'LINE_MODEL': 'Yang24', # 2409.03997
         'alpha_SFR_0': -2.43e-1,
@@ -108,7 +108,7 @@ Yang_OII_params = {
 Yang_Halpha_params = {
         'LINE': 'Ha',
         'nu_rest': 4.57e14, # 656.28 AA 
-        'OBSERVABLE_LIM': 'Tnu',
+        'OBSERVABLE_LIM': 'Inu',
         '_R ': 3, 
         'LINE_MODEL': 'Yang24', # 2409.03997
         'alpha_SFR_0': 9.94e-3,
@@ -121,7 +121,7 @@ Yang_Halpha_params = {
 Yang_Hbeta_params = {
         'LINE': 'Hb',
         'nu_rest': 6.17e14, # 486.13 AA 
-        'OBSERVABLE_LIM': 'Tnu',
+        'OBSERVABLE_LIM': 'Inu',
         '_R ': 3, 
         'LINE_MODEL': 'Yang24', # 2409.03997
         'alpha_SFR_0': 7.98e-3,
@@ -135,7 +135,7 @@ Yang_Hbeta_params = {
 THESAN_OIII_params = {
         'LINE': 'OIII',
         'nu_rest': 6.17e14, # 486.13 AA 
-        'OBSERVABLE_LIM': 'Tnu',
+        'OBSERVABLE_LIM': 'Inu',
         '_R ': 3, 
         'LINE_MODEL': 'THESAN21', # 2111.02411
         'a': 7.84,
@@ -150,7 +150,7 @@ THESAN_OIII_params = {
 THESAN_OII_params = {
         'LINE': 'OII',
         'nu_rest': 8.05e14, # 486.13 AA 
-        'OBSERVABLE_LIM': 'Tnu',
+        'OBSERVABLE_LIM': 'Inu',
         '_R ': 3, 
         'LINE_MODEL': 'THESAN21', # 2111.02411
         'a': 7.08,
@@ -164,7 +164,7 @@ THESAN_OII_params = {
 THESAN_Halpha_params = {
         'LINE': 'Ha',
         'nu_rest': 4.57e14, # 486.13 AA 
-        'OBSERVABLE_LIM': 'Tnu',
+        'OBSERVABLE_LIM': 'Inu',
         '_R ': 3, 
         'LINE_MODEL': 'THESAN21', # 2111.02411
         'a': 8.08,
@@ -178,7 +178,7 @@ THESAN_Halpha_params = {
 THESAN_Hbeta_params = {
         'LINE': 'Hb',
         'nu_rest': 6.17e14, # 486.13 AA 
-        'OBSERVABLE_LIM': 'Tnu',
+        'OBSERVABLE_LIM': 'Inu',
         '_R ': 3, 
         'LINE_MODEL': 'THESAN21', # 2111.02411
         'a': 7.62,
