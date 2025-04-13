@@ -1,49 +1,8 @@
 import oLIMpus
 
-from matplotlib import pyplot as plt
-import numpy as np
-import matplotlib as mpl
-from matplotlib.cm import get_cmap
-from matplotlib import colors as cc 
-import matplotlib.cm as cm
-from matplotlib.colors import LogNorm
 from oLIMpus.maps_LIM import build_lightcone, CoevalBox_LIM_zeuslike, CoevalBoxes_percell
 
-
-plt.rcParams.update({"text.usetex": True, "font.family": "Times new roman"}) # Use latex fonts
-plt.rcParams['lines.linewidth'] = 2
-colors = ['#001219', '#005f73', '#0a9396', '#94d2bd', '#e9d8a6', '#ee9b00', '#ca6702', '#bb3e03', '#ae2012', '#9b2226']
-mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=colors) # Set the color palette as default
-
-min_value = -100
-max_value = 50
-mid_point = abs(min_value)/(abs(min_value)+abs(max_value))
-colors_list = [(0, 'cyan'),
-                (mid_point/1.5, 'blue'),
-                (mid_point, "black"),
-                ((1.+mid_point)/2.2, 'red'),
-                (1, 'yellow')]
-eor_colour = cc.LinearSegmentedColormap.from_list("eor_colour",colors_list)
-
-
-summer_cmap = cm.summer
-colors_list = [(0, "black"),
-    (0.1, summer_cmap(0)),    
-    (0.2, summer_cmap(50)),
-    (0.5, summer_cmap(150)),
-    (1, summer_cmap(255))]     
-
-LIM_colour_1 = cc.LinearSegmentedColormap.from_list("LIM_colour_1",colors_list)
-
-
-winter_cmap = cm.winter
-colors_list = [(0, "black"),
-    (0.1, winter_cmap(0)),    
-    (0.2, winter_cmap(50)),
-    (0.5, winter_cmap(150)),
-    (1, winter_cmap(255))]     
-LIM_colour_2 = cc.LinearSegmentedColormap.from_list("LIM_colour_2",colors_list)
-
+from oLIMpus.analysis_fiducial import * 
 
 def plot_T21(z, 
              Lbox, 

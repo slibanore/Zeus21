@@ -3,8 +3,14 @@ from powerbox import get_power
 from classy import Class
 import os
 import pickle
+from scipy.optimize import brentq
+
 
 from .analysis_fiducial import * 
+
+folder_out = './analysis_' + str(Lbox_fid) + ',' + str(Nbox_fid) 
+if not os.path.exists(folder_out):
+    os.makedirs(folder_out)
 
 def run_all_fiducials():
 
@@ -12,6 +18,7 @@ def run_all_fiducials():
     k_fid = []
     r_fid = []
     s_fid = []
+    xH_fid = []
     for iz in zvals:
         print('Doing ' + str(iz))
         temp = run_analysis(iz, 
@@ -28,8 +35,9 @@ def run_all_fiducials():
         k_fid.append(temp[1])
         r_fid.append(temp[2])
         s_fid.append(temp[3])
+        #xH_fid.append(temp[4])
 
-    return P_fid, r_fid, s_fid
+    return P_fid, k_fid, r_fid, s_fid, xH_fid
 
 
 def run_variations(var_line = False, var_astro = True, var_cosmo = True):
@@ -38,40 +46,45 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
     k_var = []
     r_var = []
     s_var = []
+    xH_var = []
+    var_params = []
 
     if var_line:
         print('What parameters do you want to change in the line model?')
         return -1
 
     if var_astro:
-        var_params = ['epsstar', 'fesc']
-        print('Astro params varied: ' + str(var_params))
+        var_params_astro = ['epsstar', 'fesc']
+        print('Astro params varied: ' + str(var_params_astro))
 
         P_var_astro = []
         k_var_astro = []
         r_var_astro = []
         s_var_astro = []
+        xH_var_astro = []
 
-        for i in range(len(var_params)):
-            if var_params[i] == 'fstar':
-                values = np.linspace(0.01,1,10)
-            elif var_params[i] == 'fesc':
-                values = np.linspace(0.01,1,10)
+        for i in range(len(var_params_astro)):
+            if var_params_astro[i] == 'epsstar':
+                values = values_epsstar
+            elif var_params_astro[i] == 'fesc':
+                values = values_fesc
             
             P_var_astro.append([])
             k_var_astro.append([])
             r_var_astro.append([])
             s_var_astro.append([])
+            xH_var_astro.append([])
 
             for j in range(len(values)):
-                include_label = var_params[i] + '_' + str(round(values[j]))
-                P_var_astro[j].append([])
-                k_var_astro[j].append([])
-                r_var_astro[j].append([])
-                s_var_astro[j].append([])
-                if var_params[i] == 'epsstar':
+                include_label = var_params_astro[i] + '_' + str(round(values[j]))
+                P_var_astro[i].append([])
+                k_var_astro[i].append([])
+                r_var_astro[i].append([])
+                s_var_astro[i].append([])
+                xH_var_astro[i].append([])
+                if var_params_astro[i] == 'epsstar':
                     AstroParams_input_var = {'epsstar':values[j]}
-                elif var_params[i] == 'fesc':
+                elif var_params_astro[i] == 'fesc':
                     AstroParams_input_var = {'fesc10':values[j]}
                 for iz in zvals:
                     temp = run_analysis(iz, 
@@ -88,39 +101,45 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
                     k_var_astro[i][j].append(temp[1])
                     r_var_astro[i][j].append(temp[2])
                     s_var_astro[i][j].append(temp[3])
+                    #xH_var_astro[i][j].append(temp[4])
 
         P_var.append(P_var_astro)
-        k_var.append(P_var_astro)
-        r_var.append(P_var_astro)
-        s_var.append(P_var_astro)
-            
+        k_var.append(k_var_astro)
+        r_var.append(r_var_astro)
+        s_var.append(s_var_astro)
+        xH_var.append(s_var_astro)
+        var_params.append(var_params_astro)
+
     if var_cosmo:
-        var_params = ['OmegaC']
-        print('Astro params varied: ' + str(var_params))
+        var_params_cosmo = ['OmegaC']
+        print('Cosmo params varied: ' + str(var_params_cosmo))
 
         P_var_cosmo = []
         k_var_cosmo = []
         r_var_cosmo = []
         s_var_cosmo = []
+        xH_var_cosmo = []
 
-        for i in range(len(var_params)):
-            if var_params[i] == 'OmegaC':
-                values = np.linspace(0.01,1,10)
+        for i in range(len(var_params_cosmo)):
+            if var_params_cosmo[i] == 'OmegaC':
+                values = values_OmC
             
             P_var_cosmo.append([])
             k_var_cosmo.append([])
             r_var_cosmo.append([])
             s_var_cosmo.append([])
+            xH_var_cosmo.append([])
 
             for j in range(len(values)):
 
-                include_label = var_params[i] + '_' + str(round(values[j]))
+                include_label = var_params_cosmo[i] + '_' + str(round(values[j]))
 
-                P_var_cosmo[j].append([])
-                k_var_cosmo[j].append([])
-                r_var_cosmo[j].append([])
-                s_var_cosmo[j].append([])
-                if var_params[i] == 'OmegaC':
+                P_var_cosmo[i].append([])
+                k_var_cosmo[i].append([])
+                r_var_cosmo[i].append([])
+                s_var_cosmo[i].append([])
+                xH_var_cosmo[i].append([])
+                if var_params_cosmo[i] == 'OmegaC':
                     CosmoParams_input_var = {'omegac':values[j]}
                 for iz in zvals:
                     temp = run_analysis(iz, 
@@ -137,14 +156,133 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
                     k_var_cosmo[i][j].append(temp[1])
                     r_var_cosmo[i][j].append(temp[2])
                     s_var_cosmo[i][j].append(temp[3])
+                    #xH_var_cosmo[i][j].append(temp[4])
 
         P_var.append(P_var_cosmo)
-        k_var.append(P_var_cosmo)
-        r_var.append(P_var_cosmo)
-        s_var.append(P_var_cosmo)
-            
+        k_var.append(k_var_cosmo)
+        r_var.append(r_var_cosmo)
+        s_var.append(s_var_cosmo)
+        xH_var.append(xH_var_cosmo)
+        var_params.append(var_params_cosmo)
 
-    return P_var, k_var, r_var, s_var
+    return P_var, k_var, r_var, s_var, xH_var, var_params
+
+
+def plot_Pearson(var_line = False, var_astro = True, var_cosmo = True):
+
+    P_fid, k_fid, r_fid, s_fid, xH_fid =  run_all_fiducials()
+    P_var, k_var, r_var, s_var, xH_var, var_params = run_variations(var_line, var_astro, var_cosmo)
+
+    flags = len(var_params)
+
+    for f in range(flags):
+        for p in range(len(var_params[f])):
+
+            par = var_params[f][p]
+            plt.figure(figsize=(12,8))
+            if par == 'epsstar':
+                array = values_epsstar
+            elif par == 'fesc':
+                array = values_fesc
+            elif par == 'OmegaC':
+                array = values_OmC
+            else:
+                print('Check parameter!')
+                return -1 
+            
+            zero_crossing_1 = np.zeros(len(array))
+            distance_zeros_1 = np.zeros(len(array))
+            zero_crossing_2 = np.zeros(len(array))
+            distance_zeros_2 = np.zeros(len(array))
+
+            for i in range(len(array)):
+
+                first_zero_crossing_val_1 = 0
+                second_zero_crossing_val_1 = 0
+                first_zero_crossing_val_2 = 0
+                second_zero_crossing_val_2 = 0
+
+                P_OIII = np.asarray(P_var[f][p][i]).T[0]
+                #xH_OIII_value = np.asarray(xH_var[f][p][i]).T[0]
+                P_Ha = np.asarray(P_var[f][p][i]).T[1]
+                #xH_Ha_value = np.asarray(xH_var[f][p][i]).T[1]
+                for zi in range(len(zvals)):
+                    if zi > 0:
+
+                        if P_OIII[zi-1] < 0 and P_OIII[zi] > 0 and first_zero_crossing_val_1 == 0: 
+                            first_zero_crossing_val_1_funct = interp1d([zvals[zi-1], zvals[zi]], [P_OIII[zi-1], P_OIII[zi]]) 
+                            first_zero_crossing_val_1 = brentq(first_zero_crossing_val_1_funct, zvals[zi-1], zvals[zi])
+                        if P_Ha[zi-1] < 0 and P_Ha[zi] > 0 and first_zero_crossing_val_2 == 0: 
+                            first_zero_crossing_val_2_funct = interp1d([zvals[zi-1], zvals[zi]], [P_Ha[zi-1], P_Ha[zi]])
+                            first_zero_crossing_val_2 = brentq(first_zero_crossing_val_2_funct, zvals[zi-1], zvals[zi])
+                    
+                        if P_OIII[zi-1] > 0 and P_OIII[zi] < 0 and second_zero_crossing_val_1 == 0: 
+                            second_zero_crossing_val_1_funct = interp1d([zvals[zi-1], zvals[zi]], [P_OIII[zi-1], P_OIII[zi]])
+                            second_zero_crossing_val_1 = brentq(second_zero_crossing_val_1_funct, zvals[zi-1], zvals[zi])
+
+                        if P_Ha[zi-1] > 0 and P_Ha[zi] < 0 and second_zero_crossing_val_2 == 0: 
+                            second_zero_crossing_val_2_funct = interp1d([zvals[zi-1], zvals[zi]], [P_Ha[zi-1], P_Ha[zi]])
+                            second_zero_crossing_val_2 = brentq(second_zero_crossing_val_2_funct, zvals[zi-1], zvals[zi])
+
+                label = r'$\Omega_{\rm c} = %g$'%array[i] if par == 'Omegac' else r'$\epsilon_{*} = %g$'%array[i] if par == 'epsstar' else r'$f_{\rm esc} = %g$'%array[i] 
+
+                plt.subplot(221)
+                plt.plot(zvals,P_OIII,label=label,marker='D',color=colors[i])
+                plt.plot(zvals,P_Ha,ls='--',marker='D')
+
+                plt.subplot(222)
+                #plt.plot(zvals,1-xH_OIII_value,label=label,color=colors[i],marker='D')
+                #plt.plot(zvals,1-xH_Ha_value,label=label,color=colors[i],marker='D',ls='--')
+                plt.axvline(zero_crossing_2[i],color=colors[i])
+                plt.axvline(zero_crossing_2[i],color=colors[i],ls='--')
+
+                zero_crossing_1[i] = second_zero_crossing_val_1 
+                distance_zeros_1[i] = first_zero_crossing_val_1 - second_zero_crossing_val_1
+                zero_crossing_2[i] = second_zero_crossing_val_2 
+                distance_zeros_2[i] = first_zero_crossing_val_2 - second_zero_crossing_val_2
+                
+            plt.subplot(223)
+            plt.plot(array,zero_crossing_1,label=label,color=colors[i],marker='D')
+            plt.plot(array,zero_crossing_2,ls='--',label=label,color=colors[i],marker='D')
+
+            plt.subplot(224)
+            plt.plot(array,distance_zeros_1,label=label,color=colors[i],marker='D')
+            plt.plot(array,distance_zeros_2,ls='--',label=label,color=colors[i],marker='D')
+
+            plt.subplot(221)        
+            plt.xlabel(r'$z$')
+            plt.ylabel(r'$P$')
+            plt.legend()
+            plt.axhline(0,linewidth=0.5)
+            plt.ylim(-1,1)
+
+            plt.subplot(222)
+            plt.xlabel(r'$z$')
+            plt.ylabel(r'$x_{\rm HI}$')
+            plt.legend()
+            plt.xlim(6,20)
+
+            plt.subplot(223)
+            xlab = r'$\Omega_{\rm c}$' if par == 'OmegaC' else r'$\epsilon_{*}$' if par == 'epsstar' else r'$f_{\rm esc}$'
+            plt.xlabel(xlab)
+            plt.ylabel(r'${\rm Low}-z\,{\rm crossing}$')
+            plt.ylim(6,20)
+
+            plt.subplot(224)
+            xlab = r'$\Omega_{\rm c}$' if par == 'OmegaC' else r'$\epsilon_{*}$' if par == 'epsstar' else r'$f_{\rm esc}$'
+            plt.xlabel(xlab)
+            plt.ylabel(r'${\rm Crossing distance}$')
+            plt.ylim(0,10)
+
+            plt.tight_layout()
+
+            folder_plot = folder_out + '/plots' 
+            if not os.path.exists(folder_plot):
+                os.makedirs(folder_plot)
+            plt.savefig(folder_plot + '/var_' + par + '.png')
+            plt.show()
+
+    return
 
 
 def run_analysis(z, 
@@ -165,9 +303,6 @@ def run_analysis(z,
         LineParams2_input = LineParams_Input(**LineParams2_input) 
         LineParams2 = Line_Parameters(LineParams2_input) 
 
-    folder_out = './analysis_' + str(Lbox) + ',' + str(Nbox) 
-    if not os.path.exists(folder_out):
-        os.makedirs(folder_out)
     folder = folder_out + '/z' + str(round(z,1))
     if not os.path.exists(folder):
         os.makedirs(folder)
