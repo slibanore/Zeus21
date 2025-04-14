@@ -9,7 +9,7 @@ from scipy.stats import binned_statistic_2d
 
 
 
-from .analysis_fiducial import * 
+from .fiducial_analysis import * 
 
 folder_out = './analysis_' + str(Lbox_fid) + ',' + str(Nbox_fid) 
 if not os.path.exists(folder_out):

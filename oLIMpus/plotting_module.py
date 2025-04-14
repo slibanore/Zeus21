@@ -2,7 +2,7 @@ import oLIMpus
 
 from oLIMpus.maps_LIM import build_lightcone, CoevalBox_LIM_zeuslike, CoevalBoxes_percell
 
-from oLIMpus.analysis_fiducial import * 
+from oLIMpus.fiducial_analysis import * 
 
 def plot_T21(z, 
              Lbox, 
