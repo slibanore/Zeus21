@@ -4,6 +4,9 @@ from classy import Class
 import os
 import pickle
 from scipy.optimize import brentq
+# 2D binning using scipy
+from scipy.stats import binned_statistic_2d
+
 
 
 from .analysis_fiducial import * 
@@ -35,7 +38,7 @@ def run_all_fiducials():
         k_fid.append(temp[1])
         r_fid.append(temp[2])
         s_fid.append(temp[3])
-        #xH_fid.append(temp[4])
+        xH_fid.append(temp[4])
 
     return P_fid, k_fid, r_fid, s_fid, xH_fid
 
@@ -101,7 +104,7 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
                     k_var_astro[i][j].append(temp[1])
                     r_var_astro[i][j].append(temp[2])
                     s_var_astro[i][j].append(temp[3])
-                    #xH_var_astro[i][j].append(temp[4])
+                    xH_var_astro[i][j].append(temp[4])
 
         P_var.append(P_var_astro)
         k_var.append(k_var_astro)
@@ -156,7 +159,7 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
                     k_var_cosmo[i][j].append(temp[1])
                     r_var_cosmo[i][j].append(temp[2])
                     s_var_cosmo[i][j].append(temp[3])
-                    #xH_var_cosmo[i][j].append(temp[4])
+                    xH_var_cosmo[i][j].append(temp[4])
 
         P_var.append(P_var_cosmo)
         k_var.append(k_var_cosmo)
@@ -168,122 +171,6 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
     return P_var, k_var, r_var, s_var, xH_var, var_params
 
 
-def plot_Pearson(var_line = False, var_astro = True, var_cosmo = True):
-
-    P_fid, k_fid, r_fid, s_fid, xH_fid =  run_all_fiducials()
-    P_var, k_var, r_var, s_var, xH_var, var_params = run_variations(var_line, var_astro, var_cosmo)
-
-    flags = len(var_params)
-
-    for f in range(flags):
-        for p in range(len(var_params[f])):
-
-            par = var_params[f][p]
-            plt.figure(figsize=(12,8))
-            if par == 'epsstar':
-                array = values_epsstar
-            elif par == 'fesc':
-                array = values_fesc
-            elif par == 'OmegaC':
-                array = values_OmC
-            else:
-                print('Check parameter!')
-                return -1 
-            
-            zero_crossing_1 = np.zeros(len(array))
-            distance_zeros_1 = np.zeros(len(array))
-            zero_crossing_2 = np.zeros(len(array))
-            distance_zeros_2 = np.zeros(len(array))
-
-            for i in range(len(array)):
-
-                first_zero_crossing_val_1 = 0
-                second_zero_crossing_val_1 = 0
-                first_zero_crossing_val_2 = 0
-                second_zero_crossing_val_2 = 0
-
-                P_OIII = np.asarray(P_var[f][p][i]).T[0]
-                #xH_OIII_value = np.asarray(xH_var[f][p][i]).T[0]
-                P_Ha = np.asarray(P_var[f][p][i]).T[1]
-                #xH_Ha_value = np.asarray(xH_var[f][p][i]).T[1]
-                for zi in range(len(zvals)):
-                    if zi > 0:
-
-                        if P_OIII[zi-1] < 0 and P_OIII[zi] > 0 and first_zero_crossing_val_1 == 0: 
-                            first_zero_crossing_val_1_funct = interp1d([zvals[zi-1], zvals[zi]], [P_OIII[zi-1], P_OIII[zi]]) 
-                            first_zero_crossing_val_1 = brentq(first_zero_crossing_val_1_funct, zvals[zi-1], zvals[zi])
-                        if P_Ha[zi-1] < 0 and P_Ha[zi] > 0 and first_zero_crossing_val_2 == 0: 
-                            first_zero_crossing_val_2_funct = interp1d([zvals[zi-1], zvals[zi]], [P_Ha[zi-1], P_Ha[zi]])
-                            first_zero_crossing_val_2 = brentq(first_zero_crossing_val_2_funct, zvals[zi-1], zvals[zi])
-                    
-                        if P_OIII[zi-1] > 0 and P_OIII[zi] < 0 and second_zero_crossing_val_1 == 0: 
-                            second_zero_crossing_val_1_funct = interp1d([zvals[zi-1], zvals[zi]], [P_OIII[zi-1], P_OIII[zi]])
-                            second_zero_crossing_val_1 = brentq(second_zero_crossing_val_1_funct, zvals[zi-1], zvals[zi])
-
-                        if P_Ha[zi-1] > 0 and P_Ha[zi] < 0 and second_zero_crossing_val_2 == 0: 
-                            second_zero_crossing_val_2_funct = interp1d([zvals[zi-1], zvals[zi]], [P_Ha[zi-1], P_Ha[zi]])
-                            second_zero_crossing_val_2 = brentq(second_zero_crossing_val_2_funct, zvals[zi-1], zvals[zi])
-
-                label = r'$\Omega_{\rm c} = %g$'%array[i] if par == 'Omegac' else r'$\epsilon_{*} = %g$'%array[i] if par == 'epsstar' else r'$f_{\rm esc} = %g$'%array[i] 
-
-                plt.subplot(221)
-                plt.plot(zvals,P_OIII,label=label,marker='D',color=colors[i])
-                plt.plot(zvals,P_Ha,ls='--',marker='D')
-
-                plt.subplot(222)
-                #plt.plot(zvals,1-xH_OIII_value,label=label,color=colors[i],marker='D')
-                #plt.plot(zvals,1-xH_Ha_value,label=label,color=colors[i],marker='D',ls='--')
-                plt.axvline(zero_crossing_2[i],color=colors[i])
-                plt.axvline(zero_crossing_2[i],color=colors[i],ls='--')
-
-                zero_crossing_1[i] = second_zero_crossing_val_1 
-                distance_zeros_1[i] = first_zero_crossing_val_1 - second_zero_crossing_val_1
-                zero_crossing_2[i] = second_zero_crossing_val_2 
-                distance_zeros_2[i] = first_zero_crossing_val_2 - second_zero_crossing_val_2
-                
-            plt.subplot(223)
-            plt.plot(array,zero_crossing_1,label=label,color=colors[i],marker='D')
-            plt.plot(array,zero_crossing_2,ls='--',label=label,color=colors[i],marker='D')
-
-            plt.subplot(224)
-            plt.plot(array,distance_zeros_1,label=label,color=colors[i],marker='D')
-            plt.plot(array,distance_zeros_2,ls='--',label=label,color=colors[i],marker='D')
-
-            plt.subplot(221)        
-            plt.xlabel(r'$z$')
-            plt.ylabel(r'$P$')
-            plt.legend()
-            plt.axhline(0,linewidth=0.5)
-            plt.ylim(-1,1)
-
-            plt.subplot(222)
-            plt.xlabel(r'$z$')
-            plt.ylabel(r'$x_{\rm HI}$')
-            plt.legend()
-            plt.xlim(6,20)
-
-            plt.subplot(223)
-            xlab = r'$\Omega_{\rm c}$' if par == 'OmegaC' else r'$\epsilon_{*}$' if par == 'epsstar' else r'$f_{\rm esc}$'
-            plt.xlabel(xlab)
-            plt.ylabel(r'${\rm Low}-z\,{\rm crossing}$')
-            plt.ylim(6,20)
-
-            plt.subplot(224)
-            xlab = r'$\Omega_{\rm c}$' if par == 'OmegaC' else r'$\epsilon_{*}$' if par == 'epsstar' else r'$f_{\rm esc}$'
-            plt.xlabel(xlab)
-            plt.ylabel(r'${\rm Crossing distance}$')
-            plt.ylim(0,10)
-
-            plt.tight_layout()
-
-            folder_plot = folder_out + '/plots' 
-            if not os.path.exists(folder_plot):
-                os.makedirs(folder_plot)
-            plt.savefig(folder_plot + '/var_' + par + '.png')
-            plt.show()
-
-    return
-
 
 def run_analysis(z, 
              Lbox, 
@@ -292,6 +179,7 @@ def run_analysis(z,
             AstroParams_input, 
             CosmoParams_input,
             LineParams2_input = False,
+            foregrounds = False, 
             store_quantities = True,
             include_label = ''
             ):
@@ -308,7 +196,8 @@ def run_analysis(z,
         os.makedirs(folder)
         
     filename_all = folder + '/slices_' + include_label + str(islice) + '.pkl'
-    if os.path.isfile(filename_all):
+    filename_xH = folder_out + '/xHavg' + include_label + '.dat'
+    if os.path.isfile(filename_all) and os.path.isfile(filename_xH):
         with open(filename_all, 'rb') as handle:
             temp =  pickle.load(handle)
             slice_T21 = temp['T21']
@@ -319,6 +208,22 @@ def run_analysis(z,
         LIM_box = False
         if LineParams2_input:
             LIM_box2 = False
+
+        data_reionization = np.loadtxt(filename_xH)
+        try:
+            z_vals = data_reionization[:, 0]
+            xH_vals = data_reionization[:, 1]
+            # Find index where z == z0 (within a small tolerance to avoid float issues)
+            idx = np.where(np.isclose(z_vals, z, atol=1e-8))[0]
+            
+            if idx.size == 0:
+                raise ValueError(f"z = {z} not found in {filename_xH}") 
+            xH_avg = xH_vals[idx[0]]
+
+        except:
+            xH_avg = data_reionization[1]
+
+
     else:
         # 1) setup the run 
         ClassCosmo = Class()
@@ -369,6 +274,8 @@ def run_analysis(z,
         if LineParams2_input:
             slice_LIM2 = LIM_box2[islice]
 
+        xH_avg = np.mean(xHI_box)
+
         # 5) store quantities for animation and lightcone
         if store_quantities:
 
@@ -380,29 +287,38 @@ def run_analysis(z,
                     pickle.dump({'delta': delta_box[islice], 'T21': slice_T21, 'SFRD': SFRD_box[islice], \
                     'xHI': xHI_box[islice], LineParams.LINE: slice_LIM}, handle)
 
+            if not os.path.exists(filename_xH):
+                with open(filename_xH, 'w') as f:
+                    f.write("# z xH\n")  # optional header
+                # Append the new (z, xH) value
+                with open(filename_xH, 'a') as f:
+                    f.write(f"{z:.6e} {xH_avg:.6e}\n")
+
     # 6) compute correlations
-    Pear = Pearson(slice_LIM, slice_T21)
-    k, ratio_cross = ratio_pk(LIM_box, T21_box, Lbox, Nbox, LineParams.LINE, store_quantities, folder, include_label)
+    Pear = Pearson(slice_LIM, slice_T21, foregrounds)
+    k, ratio_cross = ratio_pk(LIM_box, T21_box, Lbox, Nbox, LineParams.LINE, foregrounds, store_quantities, folder, include_label)
     squared_cross_val = squared_cross(LIM_box, T21_box, Lbox, Nbox, LineParams.LINE, store_quantities, folder, include_label)
     if LineParams2_input:
-        Pear2 = Pearson(slice_LIM2, slice_T21)
-        k2, ratio_cross2 = ratio_pk(LIM_box2, T21_box, Lbox, Nbox, LineParams2.LINE, store_quantities, folder, include_label)
+        Pear2 = Pearson(slice_LIM2, slice_T21, foregrounds)
+        k2, ratio_cross2 = ratio_pk(LIM_box2, T21_box, Lbox, Nbox, LineParams2.LINE, foregrounds, store_quantities, folder, include_label)
         squared_cross_val2 = squared_cross(LIM_box2, T21_box, Lbox, Nbox, LineParams2.LINE, store_quantities, folder, include_label)
 
     if LineParams2:
-        return [Pear, Pear2], [k,k2], [ratio_cross, ratio_cross2], [squared_cross_val, squared_cross_val2]
+        return [Pear, Pear2], [k,k2], [ratio_cross, ratio_cross2], [squared_cross_val, squared_cross_val2], [xH_avg, xH_avg]
     else:
-        return Pear, k, ratio_cross, squared_cross_val
+        return Pear, k, ratio_cross, squared_cross_val, xH_avg
 
 
-def Pearson(slice_LIM, slice_T21):
+def Pearson(slice_LIM, slice_T21, foregrounds):
 
     cross_TLIM1 = np.corrcoef((slice_T21.flatten()), slice_LIM.flatten())[0, 1]
+    if foregrounds:
+        print('Foregrounds not yet implemented')
 
     return cross_TLIM1
 
 
-def ratio_pk(box_LIM, box_T21, Lbox, Nbox, line, store_quantities, folder, include_label):
+def ratio_pk(box_LIM, box_T21, Lbox, Nbox, line, foregrounds, store_quantities, folder, include_label):
 
     filename_all = folder + '/powerspectra_' + include_label + line + '.pkl'
 
@@ -455,6 +371,9 @@ def ratio_pk(box_LIM, box_T21, Lbox, Nbox, line, store_quantities, folder, inclu
         )
         pk_cross, k_cross = list(res)
 
+        if foregrounds:
+            print('Foregrounds not yet implemented')
+
         if store_quantities:
             with open(filename_all, 'wb') as handle:
                 pickle.dump({'k': k_cross, 'Pk_21': pk_21, 'Pk_line': pk_LIM, 'Pk_cross': pk_cross}, handle)
@@ -480,6 +399,45 @@ def squared_cross(box_LIM, box_T21, Lbox, Nbox, line, store_quantities, folder, 
         if not box_LIM or not box_T21:
             print('Warning! The function ratio_pk requires boxes to run, since there are no spectra stored')
             return -1
+
+    kx = np.fft.fftshift(np.fft.fftfreq(Nbox, d=Lbox / Nbox)) * 2 * np.pi
+    ky = np.fft.fftshift(np.fft.fftfreq(Nbox, d=Lbox / Nbox)) * 2 * np.pi
+    kz = np.fft.fftshift(np.fft.fftfreq(Nbox, d=Lbox / Nbox)) * 2 * np.pi
+
+    kx3d, ky3d, kz3d = np.meshgrid(kx, ky, kz, indexing='ij')
+    k_perp = np.sqrt(kx3d**2 + ky3d**2)
+    k_par = np.abs(kz3d)
+
+    kperp_flat = k_perp.ravel()
+    kpar_flat = k_par.ravel()
+    power_flat_21 = pk_21.ravel()
+    power_flat_LIM = pk_LIM.ravel()
+    power_flat_cross = pk_cross.ravel()
+
+    # Choose bin edges
+    n_bins = 40
+    kperp_bins = np.linspace(0, np.max(k_perp), n_bins + 1)
+    kpar_bins = np.linspace(0, np.max(k_par), n_bins + 1)
+
+
+    P_kperp_kpar_21, _, _, _ = binned_statistic_2d(
+        kperp_flat, kpar_flat, power_flat_21,
+        statistic='mean', bins=[kperp_bins, kpar_bins]
+    )
+    P_kperp_kpar_LIM, _, _, _ = binned_statistic_2d(
+        kperp_flat, kpar_flat, power_flat_LIM,
+        statistic='mean', bins=[kperp_bins, kpar_bins]
+    )
+    P_kperp_kpar_cross, _, _, _ = binned_statistic_2d(
+        kperp_flat, kpar_flat, power_flat_cross,
+        statistic='mean', bins=[kperp_bins, kpar_bins]
+    )
+
+    # Bin centers
+    kperp_centers = 0.5 * (kperp_bins[1:] + kperp_bins[:-1])
+    kpar_centers = 0.5 * (kpar_bins[1:] + kpar_bins[:-1])
+
+    # compute C and the cross ratio ...
 
 
     return 

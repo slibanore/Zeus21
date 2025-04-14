@@ -170,12 +170,26 @@ class get_LIM_coefficients:
         midpoint = deltaArray_LIM.shape[-1]//2 
         # !!! note that it is still 2D but the dimension in R is 1 
         self.gammaLIM_index = np.log(self.rhoL_dR[:,:,midpoint+1]/self.rhoL_dR[:,:,midpoint-1]) / (deltaArray_LIM[:,:,0,midpoint+1] - deltaArray_LIM[:,:,0,midpoint-1])
-        self.gammaLIM_index[np.isnan(self.gammaLIM_index)] = 0.0
+        self.gammaLIM_index[np.isnan(self.gammaLIM_index)] = 0.0            
 
         #compute second-order derivative gammas by computing two first-order derivatives #TODO: functionalize derivatives
+        '''
         der1_LIM =  np.log(self.rhoL_dR[:,:,midpoint]/self.rhoL_dR[:,:,midpoint-1])/(deltaArray_LIM[:,:,0,midpoint] - deltaArray_LIM[:,:,0,midpoint-1]) #ln(y2/y1)/(x2-x1)
         der2_LIM =  np.log(self.rhoL_dR[:,:,midpoint+1]/self.rhoL_dR[:,:,midpoint])/(deltaArray_LIM[:,:,0,midpoint+1] - deltaArray_LIM[:,:,0,midpoint]) #ln(y3/y2)/(x3-x2)
-        self.gamma2_LIM_index = (der2_LIM - der1_LIM)/(deltaArray_LIM[:,:,0,midpoint+1] - deltaArray_LIM[:,:,0,midpoint-1]) #second derivative: (der2-der1)/((x3-x1)/2)
+        self.gamma2_LIM_index = (der2_LIM - der1_LIM)/(deltaArray_LIM[:,:,0,midpoint+1] - deltaArray_LIM[:,:,0,midpoint-1]) /
+        #second derivative: (der2-der1)/(x3-x1)/2
+        '''
+
+        x0 = deltaArray_LIM[:,:,0,midpoint-1]
+        x1 = deltaArray_LIM[:,:,0,midpoint]
+        x2 = deltaArray_LIM[:,:,0,midpoint+1]
+
+        y0 = np.log(self.rhoL_dR[:,:,midpoint-1])
+        y1 = np.log(self.rhoL_dR[:,:,midpoint])
+        y2 = np.log(self.rhoL_dR[:,:,midpoint+1])
+
+        self.gamma2_LIM_index = 2.*(y0/((x1-x0)*(x2-x0)) + y2/((x2-x1)*(x2-x0)) - y1/((x2-x1)*(x1-x0))) / 2.
+
         self.gamma2_LIM_index[np.isnan(self.gamma2_LIM_index)] = 0.0
 
         # ?? no velocity anisotropies and VCB effect ??

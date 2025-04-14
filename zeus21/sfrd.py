@@ -263,16 +263,39 @@ class get_T21_coefficients:
         self.gamma_niondot_II_index2D[np.isnan(self.gamma_niondot_II_index2D)] = 0.0
 
         #compute second-order derivative gammas by computing two first-order derivatives #TODO: functionalize derivatives
+        '''
         der1_II =  np.log(self.SFRD_II_dR[:,:,midpoint]/self.SFRD_II_dR[:,:,midpoint-1])/(deltaArray[:,:,0,midpoint] - deltaArray[:,:,0,midpoint-1]) #ln(y2/y1)/(x2-x1)
         der2_II =  np.log(self.SFRD_II_dR[:,:,midpoint+1]/self.SFRD_II_dR[:,:,midpoint])/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint]) #ln(y3/y2)/(x3-x2)
-        self.gamma2_II_index2D = (der2_II - der1_II)/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1]) #second derivative: (der2-der1)/((x3-x1)/2)
+        self.gamma2_II_index2D = (der2_II - der1_II)/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1]) 
+        '''
+
+        x0 = deltaArray[:,:,0,midpoint-1]
+        x1 = deltaArray[:,:,0,midpoint]
+        x2 = deltaArray[:,:,0,midpoint+1]
+
+        y0 = np.log(self.SFRD_II_dR[:,:,midpoint-1])
+        y1 = np.log(self.SFRD_II_dR[:,:,midpoint])
+        y2 = np.log(self.SFRD_II_dR[:,:,midpoint+1])
+
+        self.gamma2_II_index2D = 2.*(y0/((x1-x0)*(x2-x0)) + y2/((x2-x1)*(x2-x0)) - y1/((x2-x1)*(x1-x0))) / 2.
+
         self.gamma2_II_index2D[np.isnan(self.gamma2_II_index2D)] = 0.0
         
+        '''
         der1_niondot_II =  np.log(niondot_II_dR[:,:,midpoint]/niondot_II_dR[:,:,midpoint-1])/(deltaArray[:,:,0,midpoint] - deltaArray[:,:,0,midpoint-1]) #ln(y2/y1)/(x2-x1)
         der2_niondot_II =  np.log(niondot_II_dR[:,:,midpoint+1]/niondot_II_dR[:,:,midpoint])/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint]) #ln(y3/y2)/(x3-x2)
-        self.gamma2_niondot_II_index2D = (der2_niondot_II - der1_niondot_II)/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1]) #second derivative: (der2-der1)/((x3-x1)/2)
-        self.gamma2_niondot_II_index2D[np.isnan(self.gamma2_niondot_II_index2D)] = 0.0
+        self.gamma2_niondot_II_index2D = (der2_niondot_II - der1_niondot_II)/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1]) / 2. #second derivative: (der2-der1)/((x3-x1)/2)
+        '''
 
+        y0 = np.log(niondot_II_dR[:,:,midpoint-1])
+        y1 = np.log(niondot_II_dR[:,:,midpoint])
+        y2 = np.log(niondot_II_dR[:,:,midpoint+1])
+
+        self.gamma2_niondot_II_index2D = 2.*(y0/((x1-x0)*(x2-x0)) + y2/((x2-x1)*(x2-x0)) - y1/((x2-x1)*(x1-x0))) / 2.
+
+        self.gamma2_niondot_II_index2D[np.isnan(self.gamma2_niondot_II_index2D)] = 0.0
+        
+        
         if Astro_Parameters.USE_POPIII == True:
             # self.gamma_III_index2D = np.log(SFRD_III_dR[:,:,-1]/SFRD_III_dR[:,:,0]) / (deltaArray[:,:,0,-1] - deltaArray[:,:,0,0])
             self.gamma_III_index2D = np.log(SFRD_III_dR[:,:,midpoint+1]/SFRD_III_dR[:,:,midpoint-1]) / (deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1])
@@ -283,12 +306,12 @@ class get_T21_coefficients:
 
             der1_III =  np.log(SFRD_III_dR[:,:,midpoint]/SFRD_III_dR[:,:,midpoint-1])/(deltaArray[:,:,0,midpoint] - deltaArray[:,:,0,midpoint-1]) #ln(y2/y1)/(x2-x1)
             der2_III =  np.log(SFRD_III_dR[:,:,midpoint+1]/SFRD_III_dR[:,:,midpoint])/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint]) #ln(y3/y2)/(x3-x2)
-            self.gamma2_III_index2D = (der2_III - der1_III)/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1]) #second derivative: (der2-der1)/((x3-x1)/2)
+            self.gamma2_III_index2D = (der2_III - der1_III)/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1]) / 2. #second derivative: (der2-der1)/((x3-x1)/2)
             self.gamma2_III_index2D[np.isnan(self.gamma2_III_index2D)] = 0.0
 
             der1_niondot_III =  np.log(niondot_III_dR[:,:,midpoint]/niondot_III_dR[:,:,midpoint-1])/(deltaArray[:,:,0,midpoint] - deltaArray[:,:,0,midpoint-1]) #ln(y2/y1)/(x2-x1)
             der2_niondot_III =  np.log(niondot_III_dR[:,:,midpoint+1]/niondot_III_dR[:,:,midpoint])/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint]) #ln(y3/y2)/(x3-x2)
-            self.gamma2_niondot_III_index2D = (der2_niondot_III - der1_niondot_III)/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1]) #second derivative: (der2-der1)/((x3-x1)/2)
+            self.gamma2_niondot_III_index2D = (der2_niondot_III - der1_niondot_III)/(deltaArray[:,:,0,midpoint+1] - deltaArray[:,:,0,midpoint-1]) / 2. #second derivative: (der2-der1)/((x3-x1)/2)
             self.gamma2_niondot_III_index2D[np.isnan(self.gamma2_niondot_III_index2D)] = 0.0
 
         else:
