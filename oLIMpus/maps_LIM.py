@@ -18,7 +18,8 @@ import numpy as np
 import powerbox as pbox
 from scipy.interpolate import interp1d
 from pyfftw import empty_aligned as empty
-
+import os
+import pickle
 
 # This function produces density and LIM maps analogously to the way Zeus21 produces the 21cm ones, using the excess power between linear and non linear power spectra
 class CoevalBox_LIM_zeuslike:
@@ -203,8 +204,23 @@ def build_lightcone(which_lightcone,
              ClassyCosmo, 
              HMFintclass, 
              CosmoParams,      
-             ZMIN,        
+             ZMIN,    
+             include_label = ''    
              ):
+
+    folder_out = './analysis_' + str(Lbox) + ',' + str(Ncell) 
+    if not os.path.exists(folder_out):
+        os.makedirs(folder_out)
+
+    folder = folder_out + '/lightcones'
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+        
+    filename_all = folder + which_lightcone + include_label + '.pkl'
+    if os.path.exists(filename_all):
+        with open(filename_all, 'rb') as handle:
+            lightcone = pickle.load(handle)
+            return lightcone
 
     zvals = input_zvals[::-1]
 
@@ -286,5 +302,9 @@ def build_lightcone(which_lightcone,
         lightcone[:, :, z_idx] = (1 - w) * mat1[:, :, z_idx % Ncell] + w * mat2[:, :, z_idx % Ncell]
 
     lightcone[np.isnan(lightcone)] = 0.
+
+    with open(filename_all, 'wb') as handle:
+        pickle.dump(lightcone,handle)
+    
 
     return lightcone

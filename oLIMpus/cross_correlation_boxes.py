@@ -15,6 +15,54 @@ folder_out = './analysis_' + str(Lbox_fid) + ',' + str(Nbox_fid)
 if not os.path.exists(folder_out):
     os.makedirs(folder_out)
 
+
+def run_all_lighcones():
+
+    CosmoParams_input = Cosmo_Parameters_Input(**CosmoParams_input_fid)
+    ClassyCosmo = cosmology.runclass(CosmoParams_input) 
+    CosmoParams = Cosmo_Parameters(CosmoParams_input, ClassyCosmo) 
+    HMFintclass = cosmology.HMF_interpolator(CosmoParams,ClassyCosmo)
+    AstroParams_fid = Astro_Parameters(CosmoParams,**AstroParams_input_fid)
+    LineParams_input_1 = LineParams_Input(**LineParams_input_1_fid) 
+    LineParams_input_2 = LineParams_Input(**LineParams_input_2_fid) 
+
+    which_lightcone = ['density','SFRD','xHI','T21','LIM']
+    for i in which_lightcone:
+        build_lightcone(i,
+                    zvals,
+                    Lbox_fid, 
+                    Nbox_fid, 
+                    seed, 
+                    RSDMODE, 
+                    False, 
+                    LineParams_input_1, 
+                    AstroParams_fid, 
+                    ClassyCosmo, 
+                    HMFintclass, 
+                    CosmoParams_input,      
+                    ZMIN,    
+                    include_label = ''    
+                    )
+
+    build_lightcone('LIM',
+                zvals,
+                Lbox_fid, 
+                Nbox_fid, 
+                seed, 
+                RSDMODE, 
+                False, 
+                LineParams_input_2, 
+                AstroParams_fid, 
+                ClassyCosmo, 
+                HMFintclass, 
+                CosmoParams_input,      
+                ZMIN,    
+                include_label = ''    
+                )
+
+    return 
+
+
 def run_all_fiducials():
 
     P_fid = []

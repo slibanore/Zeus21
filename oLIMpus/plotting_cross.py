@@ -152,7 +152,66 @@ def plot_Pearson(var_line = False, var_astro = True, var_cosmo = True):
             folder_plot = folder_out + '/plots' 
             if not os.path.exists(folder_plot):
                 os.makedirs(folder_plot)
-            plt.savefig(folder_plot + '/var_' + par + '.png')
+            plt.savefig(folder_plot + '/Pearson_' + par + '.png')
             plt.show()
 
     return
+
+
+def plot_pk_ratio(var_line = False, var_astro = True, var_cosmo = True):
+
+    P_fid, k_fid, r_fid, s_fid, xH_fid =  run_all_fiducials()
+    P_var, k_var, r_var, s_var, xH_var, var_params = run_variations(var_line, var_astro, var_cosmo)
+
+    flags = len(var_params)
+
+    for f in range(flags):
+        for p in range(len(var_params[f])):
+
+            par = var_params[f][p]
+            plt.figure(figsize=(12,8))
+            if par == 'epsstar':
+                array = values_epsstar
+                fid_value = AstroParams_input_fid['epsstar']
+            elif par == 'fesc':
+                array = values_fesc
+                fid_value = AstroParams_input_fid['fesc10']
+            elif par == 'OmegaC':
+                array = values_OmC
+                fid_value = CosmoParams_input_fid['omegac']
+            else:
+                print('Check parameter!')
+                return -1 
+
+            fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(13, 6))
+            for i in range(len(array)):
+
+                for iz in tqdm(zvals):
+
+                    ax[0].plot(k_var[f][p][i][iz][0], r_var[f][p][i][iz][0], label= r'$z=%g,\,$'%zvals[iz]+ r'$x_{HII} = %g$'%round(1-xH_var[f][p][i][iz][0],1),color =  colors[list(zvals).index(iz)],ls='-' )
+
+                    ax[0].plot(k_var[f][p][i][iz][1], r_var[f][p][i][iz][1], label= r'$z=%g,\,$'%zvals[iz]+ r'$x_{HII} = %g$'%round(1-xH_var[f][p][i][iz][1],1),color =  colors[list(zvals).index(iz)],ls='-' )
+
+            for iz in tqdm(zvals):
+
+                ax[0].plot(k_fid[f][p][i][iz][0], r_fid[f][p][i][iz][0], label= r'$z=%g,\,$'%zvals[iz]+ r'$x_{HII} = %g$'%round(1-xH_fid[f][p][i][iz][0],1),color =  colors[list(zvals).index(iz)],ls='-' )
+
+                ax[0].plot(k_fid[f][p][i][iz][1], r_fid[f][p][i][iz][1], label= r'$z=%g,\,$'%zvals[iz]+ r'$x_{HII} = %g$'%round(1-xH_fid[f][p][i][iz][1],1),color =  colors[list(zvals).index(iz)],ls='-' )
+
+            ax[0].legend(loc = 1,fontsize=13,ncol=1)
+            ax[0].set_xlabel(r'$k\,[{\rm Mpc^{-1}}]$',fontsize=15)
+            ax[0].set_ylabel(r'$r_{12}$',fontsize=15)
+            ax[0].set_title(r'$T_{21}\times T_{\rm OIII}$')
+
+            ax[1].legend(loc = 1,fontsize=13,ncol=1)
+            ax[1].set_xlabel(r'$k\,[{\rm Mpc^{-1}}]$',fontsize=15)
+            ax[1].set_ylabel(r'$r_{12}$',fontsize=15)
+            ax[1].set_title(r'$T_{21}\times T_{\rm H\alpha}$')
+
+            folder_plot = folder_out + '/plots' 
+            if not os.path.exists(folder_plot):
+                os.makedirs(folder_plot)
+            plt.savefig(folder_plot + '/pkratio_' + par + '.png')
+            plt.show()
+
+    return 

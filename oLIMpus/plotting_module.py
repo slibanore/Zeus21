@@ -241,7 +241,7 @@ def plot_lightcone(which_lightcone,
         vmin = -0.6
         vmax = 0.6
     elif which_lightcone == 'SFRD':
-        text_label_helper = r'$\rm SFRD\,[M_\odot/{\rm (yr Mpc^{-3})}}]$'
+        text_label_helper = r'$\rm SFRD\,[M_\odot\,{\rm (yr Mpc^{-3})}]$'
         use_cmap = 'bwr'
         vmin = 1e-5
         vmax = 1e-1
