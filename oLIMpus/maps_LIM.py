@@ -148,7 +148,23 @@ class CoevalBoxes_percell:
 
             integrand = EPS_HMF_corr *  HMF_curr * SFRtab_currII * HMFintclass.Mhtab[:,np.newaxis]
 
-            integrand_LIM = EPS_HMF_corr *  HMF_curr * LineLuminosity(SFRtab_currII, LineParams, AstroParams, CosmoParams, HMFintclass, mArray, z)  * HMFintclass.Mhtab[:,np.newaxis]
+            if LineParams.LINE == 'Ha' and LineParams.LINE_MODEL == 'Nionrate':
+                #Z = 0.2
+                #Nion_rate = 10**(-0.0029*(np.log10(Z) + 7.3)**2.5 + 53.81 - np.log10(2.55))*SFRtab_currII # s-1 
+                BMF_val = BMF(Zeus_coefficients, HMFintclass,CosmoParams,AstroParams)
+                ir_use = idx = np.abs(CosmoParams._Rtabsmoo - Lbox/Nbox).argmin()
+
+                Nion_rate = BMF_val.niondot_delta_r(delta_box.flatten(),CosmoParams._Rtabsmoo[ir_use])
+                Nion_rate = Nion_rate.reshape((Nbox,Nbox,Nbox,len(Zeus_coefficients.zintegral)))[:,:,:,_iz]
+                print(Nion_rate)
+
+                frec = 0.45
+                hP = 1.73094832e-60 # units of Lsun * s / Hz
+                L_Halpha = hP * LineParams.nu_rest * frec * Nion_rate # Hz * s-1
+                integrand_LIM = EPS_HMF_corr *  HMF_curr * L_Halpha * HMFintclass.Mhtab[:,np.newaxis]
+
+            else:
+                integrand_LIM = EPS_HMF_corr *  HMF_curr * LineLuminosity(SFRtab_currII, LineParams, AstroParams, CosmoParams, HMFintclass, mArray, z)  * HMFintclass.Mhtab[:,np.newaxis]
 
             SFRDbox_flattend = np.trapezoid(integrand, HMFintclass.logtabMh, axis = 0) 
 

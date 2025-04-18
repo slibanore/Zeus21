@@ -8,7 +8,7 @@ from matplotlib.colors import LogNorm
 
 plt.rcParams.update({"text.usetex": True, "font.family": "Times new roman"}) # Use latex fonts
 plt.rcParams['lines.linewidth'] = 2
-colors = ['#001219', '#005f73', '#0a9396', '#94d2bd', '#e9d8a6', '#ee9b00', '#ca6702', '#bb3e03', '#ae2012', '#9b2226']
+colors = ['#001219', '#005f73', '#0a9396', '#94d2bd', '#e9d8a6', '#ee9b00', '#ca6702', '#bb3e03', '#ae2012', '#9b2226','#7f1d1d']
 mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=colors) # Set the color palette as default
 
 min_value = -100
@@ -50,13 +50,13 @@ RSDMODE = 0
 ZMIN = 5.
 islice = 0
 
-Lbox_fid = 10 #300
-Nbox_fid = 10 #150
+Lbox_fid = 300
+Nbox_fid = 150
 
-zvals = np.linspace(20.,6.,3) #71)
+zvals = np.linspace(20.,6.,71)
 
-values_epsstar = np.linspace(0.01,1,10)
-values_fesc = np.linspace(0.01,1,10)
+values_epsstar = np.linspace(0.01,1,3)#10)
+values_fesc = np.linspace(0.01,1,3)#10)
 values_OmC = np.linspace(0.1,0.2,3)#10)
 
 CosmoParams_input_fid = dict(

@@ -600,12 +600,12 @@ class Power_Spectra:
             nonlinearcorrelation = ne.evaluate('exp(numerator_NL/denominator_NL - log_norm)')
 
             # use second order in SFRD lognormal approx
-            self.expGammaCorrMinusLinear = ne.evaluate('nonlinearcorrelation - 1-gammaTimesCorrdNL')
+            expGammaCorrMinusLinear = ne.evaluate('nonlinearcorrelation - 1-gammaTimesCorrdNL')
         else:
-            self.expGammaCorrMinusLinear = ne.evaluate('exp(gammaTimesCorrdNL) - 1 - gammaTimesCorrdNL')
+            expGammaCorrMinusLinear = ne.evaluate('exp(gammaTimesCorrdNL) - 1 - gammaTimesCorrdNL')
         # --- #
 
-        self._II_deltaxi_xa = np.einsum('ijkl->il', coeffmatrixxa * self.expGammaCorrMinusLinear, optimize = True)
+        self._II_deltaxi_xa = np.einsum('ijkl->il', coeffmatrixxa * expGammaCorrMinusLinear, optimize = True)
         self._II_deltaxi_xa *= np.array([coeffzp1xa]).T**2 #brings it to xa units
 
         if (constants.FLAG_DO_DENS_NL):

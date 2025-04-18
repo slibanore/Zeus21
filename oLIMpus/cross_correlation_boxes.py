@@ -6,7 +6,7 @@ import pickle
 from scipy.optimize import brentq
 # 2D binning using scipy
 from scipy.stats import binned_statistic_2d
-
+from tqdm import tqdm
 
 
 from .fiducial_analysis import * 
@@ -78,8 +78,17 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
             s_var_astro.append([])
             xH_var_astro.append([])
 
+            P_var.append([])
+            k_var.append([])
+            r_var.append([])
+            s_var.append([])
+            xH_var.append([])
+            var_params.append([])
+
             for j in range(len(values)):
-                include_label = var_params_astro[i] + '_' + str(round(values[j]))
+                print(var_params_astro[i] + ' = ' + str(round(values[j],2)))
+
+                include_label = var_params_astro[i] + '_' + str(round(values[j],2))
                 P_var_astro[i].append([])
                 k_var_astro[i].append([])
                 r_var_astro[i].append([])
@@ -89,7 +98,7 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
                     AstroParams_input_var = {'epsstar':values[j]}
                 elif var_params_astro[i] == 'fesc':
                     AstroParams_input_var = {'fesc10':values[j]}
-                for iz in zvals:
+                for iz in tqdm(zvals):
                     temp = run_analysis(iz, 
                             Lbox_fid, 
                             Nbox_fid,
@@ -106,12 +115,12 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
                     s_var_astro[i][j].append(temp[3])
                     xH_var_astro[i][j].append(temp[4])
 
-        P_var.append(P_var_astro)
-        k_var.append(k_var_astro)
-        r_var.append(r_var_astro)
-        s_var.append(s_var_astro)
-        xH_var.append(s_var_astro)
-        var_params.append(var_params_astro)
+            P_var[i].append(P_var_astro[i])
+            k_var[i].append(k_var_astro[i])
+            r_var[i].append(r_var_astro[i])
+            s_var[i].append(s_var_astro[i])
+            xH_var[i].append(xH_var_astro[i])
+            var_params[i].append(var_params_astro[i])
 
     if var_cosmo:
         var_params_cosmo = ['OmegaC']
@@ -126,7 +135,6 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
         for i in range(len(var_params_cosmo)):
             if var_params_cosmo[i] == 'OmegaC':
                 values = values_OmC
-            
             P_var_cosmo.append([])
             k_var_cosmo.append([])
             r_var_cosmo.append([])
@@ -134,8 +142,8 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
             xH_var_cosmo.append([])
 
             for j in range(len(values)):
-
-                include_label = var_params_cosmo[i] + '_' + str(round(values[j]))
+                print(var_params_cosmo[i] + ' = ' + str(round(values[j],2)))
+                include_label = var_params_cosmo[i] + '_' + str(round(values[j],2))
 
                 P_var_cosmo[i].append([])
                 k_var_cosmo[i].append([])
@@ -144,7 +152,7 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
                 xH_var_cosmo[i].append([])
                 if var_params_cosmo[i] == 'OmegaC':
                     CosmoParams_input_var = {'omegac':values[j]}
-                for iz in zvals:
+                for iz in tqdm(zvals):
                     temp = run_analysis(iz, 
                             Lbox_fid, 
                             Nbox_fid,
@@ -155,6 +163,7 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
                             store_quantities = True,
                             include_label = include_label
                             )
+
                     P_var_cosmo[i][j].append(temp[0])
                     k_var_cosmo[i][j].append(temp[1])
                     r_var_cosmo[i][j].append(temp[2])
@@ -198,6 +207,7 @@ def run_analysis(z,
     filename_all = folder + '/slices_' + include_label + str(islice) + '.pkl'
     filename_xH = folder_out + '/xHavg' + include_label + '.dat'
     if os.path.isfile(filename_all) and os.path.isfile(filename_xH):
+        #print('Importing ' + filename_all)
         with open(filename_all, 'rb') as handle:
             temp =  pickle.load(handle)
             slice_T21 = temp['T21']
@@ -225,6 +235,7 @@ def run_analysis(z,
 
 
     else:
+        #print(filename_all + ' not foud, running')
         # 1) setup the run 
         ClassCosmo = Class()
         ClassCosmo.compute()
@@ -235,11 +246,17 @@ def run_analysis(z,
         AstroParams = Astro_Parameters(CosmoParams,**AstroParams_input)
 
         # 2) compute zeus21 quantities
-        corr_21 = Correlations(CosmoParams, ClassyCosmo)   
-        coef_21 = get_T21_coefficients(CosmoParams, ClassyCosmo, AstroParams, HMFintclass, zmin=ZMIN)
-        PS21 = Power_Spectra(CosmoParams, AstroParams, ClassyCosmo, corr_21, coef_21, RSD_MODE = RSDMODE)
-        BMF_use = BMF(coef_21, HMFintclass,CosmoParams,AstroParams)
-
+        try:
+            corr_21 = Correlations(CosmoParams, ClassyCosmo)   
+            coef_21 = get_T21_coefficients(CosmoParams, ClassyCosmo, AstroParams, HMFintclass, zmin=ZMIN)
+            PS21 = Power_Spectra(CosmoParams, AstroParams, ClassyCosmo, corr_21, coef_21, RSD_MODE = RSDMODE)
+            BMF_use = BMF(coef_21, HMFintclass,CosmoParams,AstroParams)
+        except:
+            print('Parameter set provides problem with Zeus run, please check')
+            if LineParams2:
+                return [[-1,-1],[-1,-1],[-1,-1],[-1,-1],[-1,-1]]
+            else:
+                return [-1,-1,-1,-1,-1,]
         boxes_zeus21 = maps.T21_bubbles(coef_21,PS21,z,Lbox,Nbox,seed,corr_21,CosmoParams,AstroParams,ClassyCosmo,BMF_use)
 
         # boxes of density, ionization, 21cm
@@ -290,9 +307,9 @@ def run_analysis(z,
             if not os.path.exists(filename_xH):
                 with open(filename_xH, 'w') as f:
                     f.write("# z xH\n")  # optional header
-                # Append the new (z, xH) value
-                with open(filename_xH, 'a') as f:
-                    f.write(f"{z:.6e} {xH_avg:.6e}\n")
+            # Append the new (z, xH) value
+            with open(filename_xH, 'a') as f:
+                f.write(f"{z:.6e} {xH_avg:.6e}\n")
 
     # 6) compute correlations
     Pear = Pearson(slice_LIM, slice_T21, foregrounds)
@@ -385,59 +402,59 @@ def ratio_pk(box_LIM, box_T21, Lbox, Nbox, line, foregrounds, store_quantities, 
 
 def squared_cross(box_LIM, box_T21, Lbox, Nbox, line, store_quantities, folder, include_label):
 
-    filename_all = folder + '/powerspectra_' + include_label + line + '.pkl'
+    # filename_all = folder + '/powerspectra_' + include_label + line + '.pkl'
 
-    if os.path.isfile(filename_all):
-        with open(filename_all, 'rb') as handle:
-            temp =  pickle.load(handle)
-            k_cross = temp['k']
-            pk_21 = temp['Pk_21']
-            pk_LIM = temp['Pk_line']
-            pk_cross = temp['Pk_cross']
+    # if os.path.isfile(filename_all):
+    #     with open(filename_all, 'rb') as handle:
+    #         temp =  pickle.load(handle)
+    #         k_cross = temp['k']
+    #         pk_21 = temp['Pk_21']
+    #         pk_LIM = temp['Pk_line']
+    #         pk_cross = temp['Pk_cross']
 
-    else:
-        if not box_LIM or not box_T21:
-            print('Warning! The function ratio_pk requires boxes to run, since there are no spectra stored')
-            return -1
+    # else:
+    #     if not box_LIM or not box_T21:
+    #         print('Warning! The function ratio_pk requires boxes to run, since there are no spectra stored')
+    #         return -1
 
-    kx = np.fft.fftshift(np.fft.fftfreq(Nbox, d=Lbox / Nbox)) * 2 * np.pi
-    ky = np.fft.fftshift(np.fft.fftfreq(Nbox, d=Lbox / Nbox)) * 2 * np.pi
-    kz = np.fft.fftshift(np.fft.fftfreq(Nbox, d=Lbox / Nbox)) * 2 * np.pi
+    # kx = np.fft.fftshift(np.fft.fftfreq(Nbox, d=Lbox / Nbox)) * 2 * np.pi
+    # ky = np.fft.fftshift(np.fft.fftfreq(Nbox, d=Lbox / Nbox)) * 2 * np.pi
+    # kz = np.fft.fftshift(np.fft.fftfreq(Nbox, d=Lbox / Nbox)) * 2 * np.pi
 
-    kx3d, ky3d, kz3d = np.meshgrid(kx, ky, kz, indexing='ij')
-    k_perp = np.sqrt(kx3d**2 + ky3d**2)
-    k_par = np.abs(kz3d)
+    # kx3d, ky3d, kz3d = np.meshgrid(kx, ky, kz, indexing='ij')
+    # k_perp = np.sqrt(kx3d**2 + ky3d**2)
+    # k_par = np.abs(kz3d)
 
-    kperp_flat = k_perp.ravel()
-    kpar_flat = k_par.ravel()
-    power_flat_21 = pk_21.ravel()
-    power_flat_LIM = pk_LIM.ravel()
-    power_flat_cross = pk_cross.ravel()
+    # kperp_flat = k_perp.ravel()
+    # kpar_flat = k_par.ravel()
+    # power_flat_21 = pk_21.ravel()
+    # power_flat_LIM = pk_LIM.ravel()
+    # power_flat_cross = pk_cross.ravel()
 
-    # Choose bin edges
-    n_bins = 40
-    kperp_bins = np.linspace(0, np.max(k_perp), n_bins + 1)
-    kpar_bins = np.linspace(0, np.max(k_par), n_bins + 1)
+    # # Choose bin edges
+    # n_bins = 40
+    # kperp_bins = np.linspace(0, np.max(k_perp), n_bins + 1)
+    # kpar_bins = np.linspace(0, np.max(k_par), n_bins + 1)
 
 
-    P_kperp_kpar_21, _, _, _ = binned_statistic_2d(
-        kperp_flat, kpar_flat, power_flat_21,
-        statistic='mean', bins=[kperp_bins, kpar_bins]
-    )
-    P_kperp_kpar_LIM, _, _, _ = binned_statistic_2d(
-        kperp_flat, kpar_flat, power_flat_LIM,
-        statistic='mean', bins=[kperp_bins, kpar_bins]
-    )
-    P_kperp_kpar_cross, _, _, _ = binned_statistic_2d(
-        kperp_flat, kpar_flat, power_flat_cross,
-        statistic='mean', bins=[kperp_bins, kpar_bins]
-    )
+    # P_kperp_kpar_21, _, _, _ = binned_statistic_2d(
+    #     kperp_flat, kpar_flat, power_flat_21,
+    #     statistic='mean', bins=[kperp_bins, kpar_bins]
+    # )
+    # P_kperp_kpar_LIM, _, _, _ = binned_statistic_2d(
+    #     kperp_flat, kpar_flat, power_flat_LIM,
+    #     statistic='mean', bins=[kperp_bins, kpar_bins]
+    # )
+    # P_kperp_kpar_cross, _, _, _ = binned_statistic_2d(
+    #     kperp_flat, kpar_flat, power_flat_cross,
+    #     statistic='mean', bins=[kperp_bins, kpar_bins]
+    # )
 
-    # Bin centers
-    kperp_centers = 0.5 * (kperp_bins[1:] + kperp_bins[:-1])
-    kpar_centers = 0.5 * (kpar_bins[1:] + kpar_bins[:-1])
+    # # Bin centers
+    # kperp_centers = 0.5 * (kperp_bins[1:] + kperp_bins[:-1])
+    # kpar_centers = 0.5 * (kpar_bins[1:] + kpar_bins[:-1])
 
     # compute C and the cross ratio ...
 
 
-    return 
+    return None

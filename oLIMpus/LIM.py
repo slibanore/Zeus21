@@ -348,7 +348,9 @@ def LineLuminosity(SFR, Line_Parameters, Astro_Parameters, Cosmo_Parameters, HMF
         log10_L[cond2] = a + (ma - mb) * log10_SFR_b + mb * log10_SFR[cond2]
         log10_L[cond3] = a + (ma - mb) * log10_SFR_b + (mb - mc) * log10_SFR_c + mc * log10_SFR[cond3]
 
-
+    elif Line_Parameters.LINE_MODEL == 'Nionrate':
+        print(Line_Parameters.LINE_MODEL + ' model is only valid if you are using maps!')
+        log10_L = np.zeros_like(SFR)
     else:
         print('You asked for a model or line that is not yet implemented!')
         return -1

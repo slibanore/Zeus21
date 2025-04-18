@@ -66,6 +66,69 @@ def plot_T21(z,
     return fig, ax
 
 
+def plot_xH(z, 
+             Lbox, 
+             Ncell,
+            seed, 
+            RSDMODE, 
+            AstroParams, 
+            ClassyCosmo,
+            HMFintclass,
+            CosmoParams, 
+            ZMIN, 
+            _islice= 0,
+            input_text_label = None,
+            ax = None,
+            fig = None,
+            **kwargs
+    ):
+    
+    correlations = oLIMpus.Correlations(CosmoParams, ClassyCosmo)   
+    coefficients = oLIMpus.get_T21_coefficients(CosmoParams, ClassyCosmo, AstroParams, HMFintclass, zmin=ZMIN)
+   
+    PS21 = oLIMpus.Power_Spectra(CosmoParams, AstroParams, ClassyCosmo, correlations, coefficients, RSD_MODE = RSDMODE)
+
+    BMF = oLIMpus.BMF(coefficients, HMFintclass,CosmoParams,AstroParams)
+
+    Maps_T21 = oLIMpus.maps.T21_bubbles(coefficients,PS21,z,Lbox,Ncell,seed,correlations,CosmoParams,AstroParams,ClassyCosmo,BMF)
+
+    coeval_slice_xH = Maps_T21.xHI_map[_islice]
+
+    if ax is None or fig is None:
+        fig, ax = plt.subplots(1, 1, figsize=(7,7))
+
+    plt.sca(ax)
+
+    im = ax.imshow(coeval_slice_xH,extent=(0,Lbox,0,Lbox),cmap='gray',vmax =1, vmin = 0,**kwargs)
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, format="%.0e")
+
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    xticks = np.linspace(0,-1,4)
+    array_ticks = np.vectorize(lambda x: f"{x:.0f}")(xticks)
+
+    cbar.set_ticks(xticks, labels = array_ticks)
+
+    text_label_helper = r'$\rm x_{\rm H}$'
+    if input_text_label is None:
+        text_label = text_label_helper
+    else:
+        text_label = text_label_helper + ',\,' + input_text_label
+
+    ax.text(
+        0.05, 0.05, text_label, 
+        color='black',
+        fontsize=10,
+        ha='left', va='bottom',
+        transform=ax.transAxes,  # Coordinates relative to the axis (0 to 1)
+        bbox=dict(facecolor='white', edgecolor='none', boxstyle='round,pad=0.3')  # White rounded background
+    )
+
+    return fig, ax
+
+
+
 def plot_Inu(z, 
              Lbox, 
              Ncell, 
