@@ -22,8 +22,8 @@ def run_all_fiducials():
     r_fid = []
     s_fid = []
     xH_fid = []
-    for iz in zvals:
-        print('Doing ' + str(iz))
+    print('Doing fiducials')
+    for iz in tqdm(zvals):
         temp = run_analysis(iz, 
                 Lbox_fid, 
                 Nbox_fid,

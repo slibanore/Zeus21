@@ -55,9 +55,9 @@ Nbox_fid = 150
 
 zvals = np.linspace(20.,6.,71)
 
-values_epsstar = np.linspace(0.01,1,3)#10)
-values_fesc = np.linspace(0.01,1,3)#10)
-values_OmC = np.linspace(0.1,0.2,3)#10)
+values_epsstar = np.linspace(0.01,1,10)
+values_fesc = np.linspace(0.01,1,10)
+values_OmC = np.linspace(0.1,0.2,10)
 
 CosmoParams_input_fid = dict(
         omegab= 0.0223828, 
