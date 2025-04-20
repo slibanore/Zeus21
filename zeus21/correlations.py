@@ -144,12 +144,12 @@ class Power_Spectra:
         self.RSD_MODE = RSD_MODE #redshift-space distortion mode. 0 = None (mu=0), 1 = Spherical avg (like 21-cmFAST), 2 = LoS only (mu=1). 2 is more observationally relevant, whereas 1 the standard assumption in sims. 0 is just for comparison with real-space #TODO: mode to save at different mu
 
         #first get the linear window functions -- note it already has growth factor in it, so it multiplies Pmatter(z=0)
-        self.kwindow, self.windowalpha_II = self.get_xa_window(Cosmo_Parameters, Correlations, T21_coefficients, pop = 2)
-        self._kwindowX, self.windowxray_II = self.get_Tx_window(Cosmo_Parameters, Correlations, T21_coefficients, pop = 2)
+        self.kwindow, self.windowalpha_II = self.get_xa_window(Cosmo_Parameters, Astro_Parameters, Correlations, T21_coefficients, pop = 2)
+        self._kwindowX, self.windowxray_II = self.get_Tx_window(Cosmo_Parameters, Astro_Parameters,Correlations, T21_coefficients, pop = 2)
         
         if Astro_Parameters.USE_POPIII == True:
-            self.kwindow, self.windowalpha_III = self.get_xa_window(Cosmo_Parameters, Correlations, T21_coefficients, pop = 3)
-            self._kwindowX, self.windowxray_III = self.get_Tx_window(Cosmo_Parameters, Correlations, T21_coefficients, pop = 3)
+            self.kwindow, self.windowalpha_III = self.get_xa_window(Cosmo_Parameters,Astro_Parameters, Correlations, T21_coefficients, pop = 3)
+            self._kwindowX, self.windowxray_III = self.get_Tx_window(Cosmo_Parameters,Astro_Parameters, Correlations, T21_coefficients, pop = 3)
         else:
             self.windowalpha_III = np.zeros_like(self.windowalpha_II)
             self.windowxray_III = np.zeros_like(self.windowxray_II)
@@ -452,7 +452,7 @@ class Power_Spectra:
 
 
 
-    def get_xa_window(self, Cosmo_Parameters, Correlations, T21_coefficients, pop = 0): #set pop to 2 or 3, default zero just so python doesn't complain
+    def get_xa_window(self, Cosmo_Parameters, Astro_Parameters, Correlations, T21_coefficients, pop = 0): #set pop to 2 or 3, default zero just so python doesn't complain
         "Returns the xa window function for all z in zintegral"
         
         zGreaterMatrix100 = np.copy(T21_coefficients.zGreaterMatrix)
@@ -473,6 +473,9 @@ class Power_Spectra:
             print("Must set pop to either 2 or 3!")
 
         _wincoeffsMatrix = coeffRmatrix * gammaRmatrix
+        # SarahLibanore
+        if Astro_Parameters.second_order_SFRD:
+            _wincoeffsMatrix *= T21_coefficients.sigmaofRtab/(-1+2.*T21_coefficients.gamma2_II_index2D*T21_coefficients.sigmaofRtab**2)
 
         if(Cosmo_Parameters.Flag_emulate_21cmfast==False): #do the standard 1D TopHat
             _wincoeffsMatrix /=(4*np.pi * T21_coefficients.Rtabsmoo**2) * (T21_coefficients.Rtabsmoo * T21_coefficients.dlogRR) # so we can just use mcfit for logFFT, 1/(4pir^2 * Delta r)
@@ -490,11 +493,11 @@ class Power_Spectra:
             _win_alpha = np.sum(_win_alpha, axis = 1)
 
         _win_alpha *= np.array([coeffzp*coeffJaxa]).T
-        
+
         return _kwinalpha, _win_alpha
 
 
-    def get_Tx_window(self, Cosmo_Parameters,  Correlations, T21_coefficients, pop = 0): #set pop to 2 or 3, default zero just so python doesn't complain
+    def get_Tx_window(self, Cosmo_Parameters, Astro_Parameters, Correlations, T21_coefficients, pop = 0): #set pop to 2 or 3, default zero just so python doesn't complain
         "Returns the Tx window function for all z in zintegral"
 
         zGreaterMatrix100 = np.copy(T21_coefficients.zGreaterMatrix)
@@ -513,6 +516,10 @@ class Power_Spectra:
             _coeffTx_units = T21_coefficients.coeff_Gammah_Tx_III
         else:
             print("Must set pop to either 2 or 3!")
+
+        # SarahLibanore
+        if Astro_Parameters.second_order_SFRD:
+            gammaRmatrix = (T21_coefficients.sigmaofRtab/(-1+2.*T21_coefficients.gamma2_II_index2D*T21_coefficients.sigmaofRtab**2))
 
         if(Cosmo_Parameters.Flag_emulate_21cmfast==False): #do the standard 1D TopHat
             _wincoeffs = coeffRmatrix * gammaRmatrix #array in logR space
@@ -600,7 +607,7 @@ class Power_Spectra:
             nonlinearcorrelation = ne.evaluate('exp(numerator_NL/denominator_NL - log_norm)')
 
             # use second order in SFRD lognormal approx
-            expGammaCorrMinusLinear = ne.evaluate('nonlinearcorrelation - 1-gammaTimesCorrdNL')
+            expGammaCorrMinusLinear = ne.evaluate('nonlinearcorrelation - 1-gammaTimesCorrdNL/((-1+2.*g1NL)*(-1+2.*g2NL))')
         else:
             expGammaCorrMinusLinear = ne.evaluate('exp(gammaTimesCorrdNL) - 1 - gammaTimesCorrdNL')
         # --- #
@@ -683,7 +690,7 @@ class Power_Spectra:
                 nonlinearcorrelation = ne.evaluate('exp(numerator_NL/denominator_NL - log_norm)')
 
                 # use second order in SFRD lognormal approx
-                expGammaCorrMinusLinear = ne.evaluate('nonlinearcorrelation - 1-gammaTimesCorrdNL')
+                expGammaCorrMinusLinear = ne.evaluate('nonlinearcorrelation - 1-gammaTimesCorrdNL/((-1+2.*g1NL)*(-1+2.*g2NL))')
             else:
                 expGammaCorrMinusLinear = ne.evaluate('exp(gammaTimesCorrdNL) - 1 - gammaTimesCorrdNL')
             # --- #

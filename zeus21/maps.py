@@ -115,7 +115,7 @@ class CoevalMaps:
 
 
 # SarahLibanore: from Yonni's version
-def make_ion_fields(CosmoParams, AstroParams, CoeffStructure, ClassyCosmo, CorrFClass, BMF, input_z, boxlength=300., ncells=300, seed=1234, r_precision=1., timer=True, logd = False, barrier = None, spherize=False, FLAG_return_densities = 0):
+def make_ion_fields(CosmoParams, AstroParams, CoeffStructure, CorrFClass, BMF, input_z, boxlength=300., ncells=300, seed=1234, r_precision=1., timer=True, logd = False, barrier = None, spherize=False, FLAG_return_densities = 0):
     """
     Generates a 3D map of ionized fields and ionized fraction of hydrogen.
     
@@ -127,8 +127,6 @@ def make_ion_fields(CosmoParams, AstroParams, CoeffStructure, ClassyCosmo, CorrF
         Stores cosmology.
     CoeffStructure: zeus21.get_T21_coefficients class
         Stores sfrd and 21cm coefficients.
-    ClassyCosmo: zeus21.runclass class
-        Sets up Class cosmology.
     CorrFClass: zeus21.Correlations class
         Calculates correlation functions.
     BMF: zeus21.reionization class
@@ -191,7 +189,9 @@ def make_ion_fields(CosmoParams, AstroParams, CoeffStructure, ClassyCosmo, CorrF
     klist = CorrFClass._klistCF
     pk_matter = np.zeros_like(klist)
     for i, k in enumerate(klist):
-        pk_matter[i] = ClassyCosmo.pk(k, z[0])
+#        pk_matter[i] = ClassyCosmo.pk(k, z[0])
+        #Sarah Libanore
+        pk_matter[i] = CorrFClass._PklinCF[i] * (cosmology.growth(CosmoParams, z[0]))**2
     pk_spl = spline(np.log(klist), np.log(pk_matter))
 
     #generating density map
@@ -310,7 +310,7 @@ def powerboxCtoR(pbobject,mapkin = None):
 # SarahLibanore: Temperature map using the local xHI instead of the average one
 class T21_bubbles:
 
-    def __init__(self, T21_coefficients, Power_Spectrum, z, Lbox, Nbox, seed, CorrFClass, CosmoParams, AstroParams, ClassyCosmo, BMF):
+    def __init__(self, T21_coefficients, Power_Spectrum, z, Lbox, Nbox, seed, CorrFClass, CosmoParams, AstroParams, BMF):
 
         zlist = T21_coefficients.zintegral 
         _iz = min(range(len(zlist)), key=lambda i: np.abs(zlist[i]-z)) #pick closest z
@@ -326,7 +326,7 @@ class T21_bubbles:
         klist = Power_Spectrum.klist_PS
         k3over2pi2 = klist**3/(2*np.pi**2)
 
-        temp = make_ion_fields(CosmoParams, AstroParams, T21_coefficients, ClassyCosmo, CorrFClass, BMF, z, boxlength=Lbox, ncells=Nbox, seed=seed, r_precision=1., timer=False, logd = False, barrier = None, spherize=False, FLAG_return_densities = 0)
+        temp = make_ion_fields(CosmoParams, AstroParams, T21_coefficients, CorrFClass, BMF, z, boxlength=Lbox, ncells=Nbox, seed=seed, r_precision=1., timer=False, logd = False, barrier = None, spherize=False, FLAG_return_densities = 0)
         self.xHI_map = temp[-1] * (1-temp[0][0])
 
         Pd = Power_Spectrum.Deltasq_d_lin[_iz,:]/k3over2pi2

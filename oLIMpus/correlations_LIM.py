@@ -133,7 +133,7 @@ class Power_Spectra_LIM:
 
         # LINEAR LIM power spectrum 
         # c1^2 c2^2 gamma_R0^2 D^2 Pk_lin 
-        self.window_LIM = self.get_LIM_window(Cosmo_Parameters, LIM_coefficients)
+        self.window_LIM = self.get_LIM_window(Cosmo_Parameters, Astro_Parameters, LIM_coefficients)
         self._Pk_LIM_lin = self.window_LIM**2 * Correlations._PklinCF
         self.Deltasq_LIM_lin = self._Pk_LIM_lin * self._k3over2pi2 
         
@@ -149,7 +149,7 @@ class Power_Spectra_LIM:
             # transform to power spectrum 
             self._Pk_LIM = self.get_list_PS(self._xiR0_LIM,  LIM_coefficients.zintegral)
 
-            self._Pk_LIM.T[:Cosmo_Parameters.indexminNL] = self._Pk_LIM_lin.T[:Cosmo_Parameters.indexminNL]            
+            #self._Pk_LIM.T[:Cosmo_Parameters.indexminNL] = self._Pk_LIM_lin.T[:Cosmo_Parameters.indexminNL]            
 
             self.Deltasq_LIM = self._Pk_LIM * self._k3over2pi2 
 
@@ -175,7 +175,7 @@ class Power_Spectra_LIM:
         self.Deltasq_deltaLIM = self._Pk_deltaLIM * self._k3over2pi2 
 
 
-    def get_LIM_window(self, Cosmo_Parameters, LIM_coefficients): 
+    def get_LIM_window(self, Cosmo_Parameters, Astro_Parameters, LIM_coefficients): 
         "Returns the LIM window function for all z in zintegral"
         
         # in the LIM case, we do NOT need to fourier transform this combination of coefficients, since they are not dependent on R, but they are simply constants 
@@ -189,7 +189,10 @@ class Power_Spectra_LIM:
         c2_LIM = LIM_coefficients.coeff2_LIM # only 1 R due to resolution 
         gamma_R0 = LIM_coefficients.gammaLIM_index * growth_R0 # only 1 R due to resolution 
         
-        _win_LIM = c2_LIM * gamma_R0 * np.array([c1_LIM]).T # only 1 R due to resolution - it is a Nz x 1 matrix 
+        if Astro_Parameters.second_order_SFRD:
+            _win_LIM = c2_LIM * gamma_R0*LIM_coefficients.sigmaofRtab_LIM * np.array([c1_LIM]).T /(-1+2.*LIM_coefficients.gamma2_LIM_index*LIM_coefficients.sigmaofRtab_LIM**2) # only 1 R due to resolution - it is a Nz x 1 matrix 
+        else:
+            _win_LIM = c2_LIM * (gamma_R0 *LIM_coefficients.sigmaofRtab_LIM)* np.array([c1_LIM]).T # only 1 R due to resolution - it is a Nz x 1 matrix 
         
         return _win_LIM
     

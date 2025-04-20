@@ -49,7 +49,7 @@ def plot_Pearson(var_line = False, var_astro = True, var_cosmo = True):
                 fid_value = AstroParams_input_fid['fesc10']
             elif par == 'OmegaC':
                 array = values_OmC
-                fid_value = CosmoParams_input_fid['omegac']
+                fid_value = CosmoParams_input_fid.omegac
             else:
                 print('Check parameter!')
                 return -1 
@@ -164,12 +164,12 @@ def plot_pk_ratio(var_line = False, var_astro = True, var_cosmo = True):
     P_var, k_var, r_var, s_var, xH_var, var_params = run_variations(var_line, var_astro, var_cosmo)
 
     flags = len(var_params)
-
+    some_zvals=[6.,8.,10.,14.,20.]
     for f in range(flags):
         for p in range(len(var_params[f])):
 
             par = var_params[f][p]
-            plt.figure(figsize=(12,8))
+
             if par == 'epsstar':
                 array = values_epsstar
                 fid_value = AstroParams_input_fid['epsstar']
@@ -178,35 +178,37 @@ def plot_pk_ratio(var_line = False, var_astro = True, var_cosmo = True):
                 fid_value = AstroParams_input_fid['fesc10']
             elif par == 'OmegaC':
                 array = values_OmC
-                fid_value = CosmoParams_input_fid['omegac']
+                fid_value = CosmoParams_input_fid.omegac
             else:
                 print('Check parameter!')
                 return -1 
 
-            fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(13, 6))
+            fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(12, 4))
             for i in range(len(array)):
 
-                for iz in tqdm(zvals):
+                for iz in tqdm(some_zvals):
 
-                    ax[0].plot(k_var[f][p][i][iz][0], r_var[f][p][i][iz][0], label= r'$z=%g,\,$'%zvals[iz]+ r'$x_{HII} = %g$'%round(1-xH_var[f][p][i][iz][0],1),color =  colors[list(zvals).index(iz)],ls='-' )
+                    ax[0].plot(k_var[f][p][i][list(zvals).index(iz)][0], r_var[f][p][i][list(zvals).index(iz)][0], label= r'$z=%g,\,$'%iz + r'$x_{\rm HII} = %g$'%round(1-xH_var[f][p][i][list(zvals).index(iz)][0],2),color =  colors[i+1],ls='-' )
 
-                    ax[0].plot(k_var[f][p][i][iz][1], r_var[f][p][i][iz][1], label= r'$z=%g,\,$'%zvals[iz]+ r'$x_{HII} = %g$'%round(1-xH_var[f][p][i][iz][1],1),color =  colors[list(zvals).index(iz)],ls='-' )
+                    ax[1].plot(k_var[f][p][i][list(zvals).index(iz)][1], r_var[f][p][i][list(zvals).index(iz)][1], label= r'$z=%g,\,$'%iz + r'$x_{\rm HII} = %g$'%round(1-xH_var[f][p][i][list(zvals).index(iz)][1],2),color =  colors[i+1],ls='-' )
 
-            for iz in tqdm(zvals):
+            for iz in tqdm(some_zvals):
 
-                ax[0].plot(k_fid[f][p][i][iz][0], r_fid[f][p][i][iz][0], label= r'$z=%g,\,$'%zvals[iz]+ r'$x_{HII} = %g$'%round(1-xH_fid[f][p][i][iz][0],1),color =  colors[list(zvals).index(iz)],ls='-' )
+                ax[0].plot(k_fid[list(zvals).index(iz)][0], r_fid[list(zvals).index(iz)][0], label= r'$z=%g,\,$'%iz + r'$x_{\rm HII} = %g$'%round(1-xH_fid[list(zvals).index(iz)][0],2),color =  colors[i+1],ls='-' )
 
-                ax[0].plot(k_fid[f][p][i][iz][1], r_fid[f][p][i][iz][1], label= r'$z=%g,\,$'%zvals[iz]+ r'$x_{HII} = %g$'%round(1-xH_fid[f][p][i][iz][1],1),color =  colors[list(zvals).index(iz)],ls='-' )
+                ax[1].plot(k_fid[list(zvals).index(iz)][1], r_fid[list(zvals).index(iz)][1], label= r'$z=%g,\,$'%iz + r'$x_{\rm HII} = %g$'%round(1-xH_fid[list(zvals).index(iz)][1],2),color =  colors[i+1],ls='-' )
 
-            ax[0].legend(loc = 1,fontsize=13,ncol=1)
-            ax[0].set_xlabel(r'$k\,[{\rm Mpc^{-1}}]$',fontsize=15)
-            ax[0].set_ylabel(r'$r_{12}$',fontsize=15)
-            ax[0].set_title(r'$T_{21}\times T_{\rm OIII}$')
+            fontsize= 20 
+
+            ax[0].legend(loc = 1,fontsize=fontsize-5,ncol=1)
+            ax[0].set_xlabel(r'$k\,[{\rm Mpc^{-1}}]$',fontsize=fontsize)
+            ax[0].set_ylabel(r'$r_{12}$',fontsize=fontsize)
+            ax[0].set_title(r'$T_{21}\times T_{\rm OIII}$',fontsize=fontsize)
 
             ax[1].legend(loc = 1,fontsize=13,ncol=1)
-            ax[1].set_xlabel(r'$k\,[{\rm Mpc^{-1}}]$',fontsize=15)
-            ax[1].set_ylabel(r'$r_{12}$',fontsize=15)
-            ax[1].set_title(r'$T_{21}\times T_{\rm H\alpha}$')
+            ax[1].set_xlabel(r'$k\,[{\rm Mpc^{-1}}]$',fontsize=fontsize)
+            ax[1].set_ylabel(r'$r_{12}$',fontsize=fontsize)
+            ax[1].set_title(r'$T_{21}\times T_{\rm H\alpha}$',fontsize=fontsize)
 
             folder_plot = folder_out + '/plots' 
             if not os.path.exists(folder_plot):

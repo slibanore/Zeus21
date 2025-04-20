@@ -84,6 +84,7 @@ class get_LIM_coefficients:
         zLIM, mArray_LIM = np.meshgrid(zLIMflat, HMF_interpolator.Mhtab, indexing = 'ij', sparse = True)
 
         rhoL_avg = np.trapz(rhoL_integrand(False, Line_Parameters,Astro_Parameters, Cosmo_Parameters, HMF_interpolator, mArray_LIM, zLIM), HMF_interpolator.logtabMh, axis = 1) 
+        
         rhoL_interp = sfrd.interpolate.interp1d(zLIMflat, rhoL_avg, kind = 'cubic', bounds_error = False, fill_value = 0,) 
 
         self.rhoL_avg = rhoL_interp(self.zintegral)
@@ -235,6 +236,7 @@ class get_LIM_coefficients:
         if(constants.C2_RENORMALIZATION_FLAG==True):
 
             if self.Rtabsmoo_LIM >= constants.MIN_R_NONLINEAR and self.Rtabsmoo_LIM < constants.MAX_R_NONLINEAR:
+                
                 _corrfactorEulerian_LIM = 1.0 + (self.gammaLIM_index-1.0)*self.sigmaofRtab_LIM**2
 
                 self.coeff2_LIM *= _corrfactorEulerian_LIM

@@ -7,24 +7,46 @@ from scipy.optimize import brentq
 # 2D binning using scipy
 from scipy.stats import binned_statistic_2d
 from tqdm import tqdm
+from oLIMpus.maps_LIM import build_lightcone
 
+from functools import partial
+import concurrent.futures
 
-from .fiducial_analysis import * 
+from oLIMpus.fiducial_analysis import * 
 
-folder_out = './analysis_' + str(Lbox_fid) + ',' + str(Nbox_fid) 
+save_path = os.path.join(os.getcwd(), "oLIMpus")
+folder_out = os.path.abspath(os.path.join(save_path, "..", 'analysis_' + str(Lbox_fid) + ',' + str(Nbox_fid) ))
 if not os.path.exists(folder_out):
     os.makedirs(folder_out)
 
 
-def run_all_lighcones():
+CosmoParams_input_fid = Cosmo_Parameters_Input(**CosmoParams_input_fid)
+ClassyCosmo_fid = runclass(CosmoParams_input_fid) 
+CosmoParams_fid = Cosmo_Parameters(CosmoParams_input_fid, ClassyCosmo_fid) 
+HMFintclass_fid = HMF_interpolator(CosmoParams_fid,ClassyCosmo_fid)
+AstroParams_fid = Astro_Parameters(CosmoParams_fid,**AstroParams_input_fid)
 
-    CosmoParams_input = Cosmo_Parameters_Input(**CosmoParams_input_fid)
-    ClassyCosmo = cosmology.runclass(CosmoParams_input) 
-    CosmoParams = Cosmo_Parameters(CosmoParams_input, ClassyCosmo) 
-    HMFintclass = cosmology.HMF_interpolator(CosmoParams,ClassyCosmo)
-    AstroParams_fid = Astro_Parameters(CosmoParams,**AstroParams_input_fid)
-    LineParams_input_1 = LineParams_Input(**LineParams_input_1_fid) 
-    LineParams_input_2 = LineParams_Input(**LineParams_input_2_fid) 
+corr_21_fid = Correlations(CosmoParams_fid, ClassyCosmo_fid)   
+coef_21_fid = get_T21_coefficients(CosmoParams_fid, ClassyCosmo_fid, AstroParams_fid, HMFintclass_fid, zmin=ZMIN)
+PS21_fid = Power_Spectra(CosmoParams_fid, AstroParams_fid, ClassyCosmo_fid, corr_21_fid, coef_21_fid, RSD_MODE = RSDMODE)
+BMF_fid = BMF(coef_21_fid, HMFintclass_fid,CosmoParams_fid,AstroParams_fid)
+
+LineParams_input_1_fid = LineParams_Input(**LineParams_input_1_fid) 
+LineParams1_fid = Line_Parameters(LineParams_input_1_fid) 
+
+LineParams2_input_2_fid = LineParams_Input(**LineParams_input_2_fid) 
+LineParams2_fid = Line_Parameters(LineParams2_input_2_fid) 
+
+corr_LIM_1_fid = Correlations_LIM(LineParams1_fid, CosmoParams_fid, ClassyCosmo_fid)
+coef_LIM_1_fid = get_LIM_coefficients(CosmoParams_fid,  AstroParams_fid, HMFintclass_fid, LineParams1_fid, zmin=ZMIN)
+PSLIM1_fid = Power_Spectra_LIM(CosmoParams_fid, AstroParams_fid, LineParams1_fid, corr_LIM_1_fid, coef_LIM_1_fid, RSD_MODE = RSDMODE)
+
+corr_LIM_2_fid = Correlations_LIM(LineParams2_input_2_fid, CosmoParams_fid, ClassyCosmo_fid)
+coef_LIM_2_fid = get_LIM_coefficients(CosmoParams_fid,  AstroParams_fid, HMFintclass_fid, LineParams2_input_2_fid, zmin=ZMIN)
+PSLIM_2_fid = Power_Spectra_LIM(CosmoParams_fid, AstroParams_fid, LineParams2_input_2_fid, corr_LIM_2_fid, coef_LIM_2_fid, RSD_MODE = RSDMODE)
+
+
+def run_all_lighcones():
 
     which_lightcone = ['density','SFRD','xHI','T21','LIM']
     for i in which_lightcone:
@@ -35,11 +57,11 @@ def run_all_lighcones():
                     seed, 
                     RSDMODE, 
                     False, 
-                    LineParams_input_1, 
+                    LineParams_input_1_fid, 
                     AstroParams_fid, 
-                    ClassyCosmo, 
-                    HMFintclass, 
-                    CosmoParams_input,      
+                    ClassyCosmo_fid, 
+                    HMFintclass_fid, 
+                    CosmoParams_input_fid,      
                     ZMIN,    
                     include_label = ''    
                     )
@@ -51,11 +73,11 @@ def run_all_lighcones():
                 seed, 
                 RSDMODE, 
                 False, 
-                LineParams_input_2, 
+                LineParams_input_2_fid, 
                 AstroParams_fid, 
-                ClassyCosmo, 
-                HMFintclass, 
-                CosmoParams_input,      
+                ClassyCosmo_fid, 
+                HMFintclass_fid, 
+                CosmoParams_input_fid,      
                 ZMIN,    
                 include_label = ''    
                 )
@@ -63,7 +85,7 @@ def run_all_lighcones():
     return 
 
 
-def run_all_fiducials():
+def run_all_fiducials(ncore=4):
 
     P_fid = []
     k_fid = []
@@ -71,27 +93,47 @@ def run_all_fiducials():
     s_fid = []
     xH_fid = []
     print('Doing fiducials')
-    for iz in tqdm(zvals):
-        temp = run_analysis(iz, 
-                Lbox_fid, 
-                Nbox_fid,
-                LineParams_input_1_fid,
-                AstroParams_input_fid, 
-                CosmoParams_input_fid,
-                LineParams2_input = LineParams_input_2_fid,
+
+    funct = partial(run_analysis,Lbox=Lbox_fid, 
+                Nbox=Nbox_fid,
+                corr_21=corr_21_fid,
+                coef_21=coef_21_fid,
+                PS21=PS21_fid,
+                BMF_use=BMF_fid,
+                corr_LIM=corr_LIM_1_fid,
+                coef_LIM=coef_LIM_1_fid,
+                PSLIM=PSLIM1_fid,
+                LineParams1=LineParams1_fid,
+                AstroParams=AstroParams_fid, 
+                CosmoParams=CosmoParams_fid,
+                HMFintclass=HMFintclass_fid,
+                LineParams2=LineParams2_fid,
+                corr_LIM2=corr_LIM_2_fid,
+                coef_LIM2=coef_LIM_2_fid,
+                PSLIM2=PSLIM_2_fid,
+                foregrounds = False, 
                 store_quantities = True,
-                include_label = ''
-                )
+                include_label = '')
+    
+    for iz in tqdm(range(len(zvals))):
+        temp = funct(zvals[iz])
         P_fid.append(temp[0])
         k_fid.append(temp[1])
         r_fid.append(temp[2])
         s_fid.append(temp[3])
         xH_fid.append(temp[4])
 
+    #with concurrent.futures.ProcessPoolExecutor(max_workers=ncore) as executor:
+    #    results = list(tqdm(executor.map(funct, zvals), total=len(zvals)))
+    #P_fid, k_fid, r_fid, s_fid, xH_fid = zip(*results)
+
     return P_fid, k_fid, r_fid, s_fid, xH_fid
 
 
-def run_variations(var_line = False, var_astro = True, var_cosmo = True):
+def run_variations(var_line = False, var_astro = True, var_cosmo = True,
+                    var_params_astro = ['epsstar', 'fesc'],
+                    var_params_cosmo = ['OmegaC'],
+                    ncore=4,):
 
     P_var = []
     k_var = []
@@ -105,7 +147,6 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
         return -1
 
     if var_astro:
-        var_params_astro = ['epsstar', 'fesc']
         print('Astro params varied: ' + str(var_params_astro))
 
         P_var_astro = []
@@ -146,17 +187,65 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
                     AstroParams_input_var = {'epsstar':values[j]}
                 elif var_params_astro[i] == 'fesc':
                     AstroParams_input_var = {'fesc10':values[j]}
-                for iz in tqdm(zvals):
-                    temp = run_analysis(iz, 
-                            Lbox_fid, 
-                            Nbox_fid,
-                            LineParams_input_1_fid,
-                            AstroParams_input_var, 
-                            CosmoParams_input_fid,
-                            LineParams_input_2_fid,
-                            store_quantities = True,
-                            include_label = include_label
-                            )
+
+                folder = folder_out + '/z' + str(round(zvals[0],1))
+                filename_all = folder + '/slices_' + include_label + str(islice) + '.pkl'
+                if not os.path.isfile(filename_all):
+
+                    AstroParams_var = Astro_Parameters(CosmoParams_fid,**AstroParams_input_var)
+
+                    coef_21_var = get_T21_coefficients(CosmoParams_fid, ClassyCosmo_fid, AstroParams_var, HMFintclass_fid, zmin=ZMIN)
+                    PS21_var = Power_Spectra(CosmoParams_fid, AstroParams_var, ClassyCosmo_fid, corr_21_fid, coef_21_var, RSD_MODE = RSDMODE)
+                    BMF_var = BMF(coef_21_var, HMFintclass_fid,CosmoParams_fid,AstroParams_var)
+
+                    coef_LIM_1_var = get_LIM_coefficients(CosmoParams_fid,  AstroParams_var, HMFintclass_fid, LineParams1_fid, zmin=ZMIN)
+                    PSLIM1_var = Power_Spectra_LIM(CosmoParams_fid, AstroParams_var, LineParams1_fid, corr_LIM_1_fid, coef_LIM_1_var, RSD_MODE = RSDMODE)
+
+                    coef_LIM_2_var = get_LIM_coefficients(CosmoParams_fid,  AstroParams_var, HMFintclass_fid, LineParams2_input_2_fid, zmin=ZMIN)
+                    PSLIM_2_var = Power_Spectra_LIM(CosmoParams_fid, AstroParams_var, LineParams2_input_2_fid, corr_LIM_2_fid, coef_LIM_2_var, RSD_MODE = RSDMODE)
+                else:
+                    coef_21_var=coef_21_fid
+                    PS21_var=PS21_fid
+                    BMF_var=BMF_fid
+                    coef_LIM_1_var=coef_LIM_1_fid
+                    PSLIM1_var=PSLIM1_fid
+                    AstroParams_var=AstroParams_fid
+                    coef_LIM_2_var=coef_LIM_2_fid
+                    PSLIM_2_var=PSLIM_2_fid
+
+                funct = partial(run_analysis,Lbox=Lbox_fid, 
+                    Nbox=Nbox_fid,
+                    corr_21=corr_21_fid,
+                    coef_21=coef_21_var,
+                    PS21=PS21_var,
+                    BMF_use=BMF_var,
+                    corr_LIM=corr_LIM_1_fid,
+                    coef_LIM=coef_LIM_1_var,
+                    PSLIM=PSLIM1_var,
+                    LineParams1=LineParams1_fid,
+                    AstroParams=AstroParams_var, 
+                    CosmoParams=CosmoParams_fid,
+                    HMFintclass=HMFintclass_fid,
+                    LineParams2=LineParams2_fid,
+                    corr_LIM2=corr_LIM_2_fid,
+                    coef_LIM2=coef_LIM_2_var,
+                    PSLIM2=PSLIM_2_var,
+                    foregrounds = False, 
+                    store_quantities = True,
+                    include_label = include_label)
+                
+                # with concurrent.futures.ProcessPoolExecutor(max_workers=ncore) as executor:
+                #     results = list(tqdm(executor.map(funct, zvals), total=len(zvals)))
+
+                # P_list, k_list, r_list, s_list, xH_list = zip(*results)
+                # P_var_astro[i][j].append(list(P_list))
+                # k_var_astro[i][j].append(list(k_list))
+                # r_var_astro[i][j].append(list(r_list))
+                # s_var_astro[i][j].append(list(s_list))
+                # xH_var_astro[i][j].append(list(xH_list))
+
+                for iz in tqdm(range(len(zvals))):
+                    temp = funct(zvals[iz])
                     P_var_astro[i][j].append(temp[0])
                     k_var_astro[i][j].append(temp[1])
                     r_var_astro[i][j].append(temp[2])
@@ -171,7 +260,6 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
             var_params[i].append(var_params_astro[i])
 
     if var_cosmo:
-        var_params_cosmo = ['OmegaC']
         print('Cosmo params varied: ' + str(var_params_cosmo))
 
         P_var_cosmo = []
@@ -179,6 +267,13 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
         r_var_cosmo = []
         s_var_cosmo = []
         xH_var_cosmo = []
+
+        P_var.append([])
+        k_var.append([])
+        r_var.append([])
+        s_var.append([])
+        xH_var.append([])
+        var_params.append([])
 
         for i in range(len(var_params_cosmo)):
             if var_params_cosmo[i] == 'OmegaC':
@@ -200,30 +295,88 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
                 xH_var_cosmo[i].append([])
                 if var_params_cosmo[i] == 'OmegaC':
                     CosmoParams_input_var = {'omegac':values[j]}
-                for iz in tqdm(zvals):
-                    temp = run_analysis(iz, 
-                            Lbox_fid, 
-                            Nbox_fid,
-                            LineParams_input_1_fid,
-                            AstroParams_input_fid, 
-                            CosmoParams_input_var,
-                            LineParams_input_2_fid,
-                            store_quantities = True,
-                            include_label = include_label
-                            )
 
+
+                folder = folder_out + '/z' + str(round(zvals[0],1))
+                filename_all = folder + '/slices_' + include_label + str(islice) + '.pkl'
+                if not os.path.isfile(filename_all):
+                    CosmoParams_input_var = Cosmo_Parameters_Input(**CosmoParams_input_var)
+                    ClassyCosmo_var = runclass(CosmoParams_input_var) 
+                    CosmoParams_var = Cosmo_Parameters(CosmoParams_input_var, ClassyCosmo_var) 
+                    HMFintclass_var = HMF_interpolator(CosmoParams_var,ClassyCosmo_var)
+                    AstroParams_var = Astro_Parameters(CosmoParams_var,**AstroParams_input_fid)
+
+                    corr_21_var = Correlations(CosmoParams_var, ClassyCosmo_var)   
+                    coef_21_var = get_T21_coefficients(CosmoParams_var, ClassyCosmo_var, AstroParams_var, HMFintclass_var, zmin=ZMIN)
+                    PS21_var = Power_Spectra(CosmoParams_var, AstroParams_var, ClassyCosmo_var, corr_21_var, coef_21_var, RSD_MODE = RSDMODE)
+                    BMF_var = BMF(coef_21_var, HMFintclass_var,CosmoParams_var,AstroParams_var)
+
+                    corr_LIM_1_var = Correlations_LIM(LineParams1_fid, CosmoParams_var, ClassyCosmo_var)
+                    coef_LIM_1_var = get_LIM_coefficients(CosmoParams_var,  AstroParams_var, HMFintclass_var, LineParams1_fid, zmin=ZMIN)
+                    PSLIM1_var = Power_Spectra_LIM(CosmoParams_var, AstroParams_var, LineParams1_fid, corr_LIM_1_var, coef_LIM_1_var, RSD_MODE = RSDMODE)
+
+                    corr_LIM_2_var = Correlations_LIM(LineParams2_input_2_fid, CosmoParams_var, ClassyCosmo_var)
+                    coef_LIM_2_var = get_LIM_coefficients(CosmoParams_var,  AstroParams_var, HMFintclass_var, LineParams2_input_2_fid, zmin=ZMIN)
+                    PSLIM_2_var = Power_Spectra_LIM(CosmoParams_var, AstroParams_var, LineParams2_input_2_fid, corr_LIM_2_var, coef_LIM_2_var, RSD_MODE = RSDMODE)
+                else:
+                    corr_21_var=corr_21_fid
+                    coef_21_var=coef_21_fid
+                    PS21_var=PS21_fid
+                    BMF_var=BMF_fid
+                    corr_LIM_1_var=corr_LIM_1_fid
+                    coef_LIM_1_var=coef_LIM_1_fid
+                    PSLIM1_var=PSLIM1_fid
+                    AstroParams_var=AstroParams_fid 
+                    CosmoParams_var=CosmoParams_fid
+                    HMFintclass_var=HMFintclass_fid
+                    corr_LIM_2_var=corr_LIM_2_fid
+                    coef_LIM_2_var=coef_LIM_2_fid
+                    PSLIM_2_var=PSLIM_2_fid
+
+                funct = partial(run_analysis,Lbox=Lbox_fid, 
+                            Nbox=Nbox_fid,
+                            corr_21=corr_21_var,
+                            coef_21=coef_21_var,
+                            PS21=PS21_var,
+                            BMF_use=BMF_var,
+                            corr_LIM=corr_LIM_1_var,
+                            coef_LIM=coef_LIM_1_var,
+                            PSLIM=PSLIM1_var,
+                            LineParams1=LineParams1_fid,
+                            AstroParams=AstroParams_var, 
+                            CosmoParams=CosmoParams_var,
+                            HMFintclass=HMFintclass_var,
+                            LineParams2=LineParams2_fid,
+                            corr_LIM2=corr_LIM_2_var,
+                            coef_LIM2=coef_LIM_2_var,
+                            PSLIM2=PSLIM_2_var,
+                            foregrounds = False, 
+                            store_quantities = True,
+                            include_label = include_label)
+                
+                # with concurrent.futures.ProcessPoolExecutor(max_workers=ncore) as executor:
+                #     results = list(tqdm(executor.map(funct, zvals), total=len(zvals)))
+                # P_list, k_list, r_list, s_list, xH_list = zip(*results)
+                # P_var_cosmo[i][j].append(list(P_list))
+                # k_var_cosmo[i][j].append(list(k_list))
+                # r_var_cosmo[i][j].append(list(r_list))
+                # s_var_cosmo[i][j].append(list(s_list))
+                # xH_var_cosmo[i][j].append(list(xH_list))
+
+                for iz in tqdm(range(len(zvals))):
+                    temp = funct(zvals[iz])
                     P_var_cosmo[i][j].append(temp[0])
                     k_var_cosmo[i][j].append(temp[1])
                     r_var_cosmo[i][j].append(temp[2])
                     s_var_cosmo[i][j].append(temp[3])
                     xH_var_cosmo[i][j].append(temp[4])
 
-        P_var.append(P_var_cosmo)
-        k_var.append(k_var_cosmo)
-        r_var.append(r_var_cosmo)
-        s_var.append(s_var_cosmo)
-        xH_var.append(xH_var_cosmo)
-        var_params.append(var_params_cosmo)
+            P_var[i].append(P_var_cosmo[i])
+            k_var[i].append(k_var_cosmo[i])
+            r_var[i].append(r_var_cosmo[i])
+            s_var[i].append(s_var_cosmo[i])
+            xH_var[i].append(xH_var_cosmo[i])
+            var_params[i].append(var_params_cosmo[i])
 
     return P_var, k_var, r_var, s_var, xH_var, var_params
 
@@ -232,21 +385,25 @@ def run_variations(var_line = False, var_astro = True, var_cosmo = True):
 def run_analysis(z, 
              Lbox, 
              Nbox,
-            LineParams_input,
-            AstroParams_input, 
-            CosmoParams_input,
-            LineParams2_input = False,
+            corr_21,
+            coef_21,
+            PS21,
+            BMF_use,
+            corr_LIM,
+            coef_LIM,
+            PSLIM,
+            LineParams1,
+            AstroParams, 
+            CosmoParams,
+            HMFintclass,
+            LineParams2,
+            corr_LIM2,
+            coef_LIM2,
+            PSLIM2,
             foregrounds = False, 
             store_quantities = True,
             include_label = ''
             ):
-
-    CosmoParams_input = Cosmo_Parameters_Input(**CosmoParams_input)
-    LineParams_input = LineParams_Input(**LineParams_input) 
-    LineParams = Line_Parameters(LineParams_input) 
-    if LineParams2_input:
-        LineParams2_input = LineParams_Input(**LineParams2_input) 
-        LineParams2 = Line_Parameters(LineParams2_input) 
 
     folder = folder_out + '/z' + str(round(z,1))
     if not os.path.exists(folder):
@@ -259,12 +416,12 @@ def run_analysis(z,
         with open(filename_all, 'rb') as handle:
             temp =  pickle.load(handle)
             slice_T21 = temp['T21']
-            slice_LIM = temp[LineParams_input.LINE]
-            if LineParams2_input:
-                slice_LIM2 = temp[LineParams2_input.LINE]
+            slice_LIM = temp[LineParams1.LINE]
+            if LineParams2:
+                slice_LIM2 = temp[LineParams2.LINE]
         T21_box = False
         LIM_box = False
-        if LineParams2_input:
+        if LineParams2:
             LIM_box2 = False
 
         data_reionization = np.loadtxt(filename_xH)
@@ -281,52 +438,26 @@ def run_analysis(z,
         except:
             xH_avg = data_reionization[1]
 
-
     else:
-        #print(filename_all + ' not foud, running')
-        # 1) setup the run 
-        ClassCosmo = Class()
-        ClassCosmo.compute()
-        
-        ClassyCosmo = runclass(CosmoParams_input) 
-        CosmoParams = Cosmo_Parameters(CosmoParams_input, ClassyCosmo) 
-        HMFintclass = HMF_interpolator(CosmoParams,ClassyCosmo)
-        AstroParams = Astro_Parameters(CosmoParams,**AstroParams_input)
 
-        # 2) compute zeus21 quantities
-        try:
-            corr_21 = Correlations(CosmoParams, ClassyCosmo)   
-            coef_21 = get_T21_coefficients(CosmoParams, ClassyCosmo, AstroParams, HMFintclass, zmin=ZMIN)
-            PS21 = Power_Spectra(CosmoParams, AstroParams, ClassyCosmo, corr_21, coef_21, RSD_MODE = RSDMODE)
-            BMF_use = BMF(coef_21, HMFintclass,CosmoParams,AstroParams)
-        except:
-            print('Parameter set provides problem with Zeus run, please check')
-            if LineParams2:
-                return [[-1,-1],[-1,-1],[-1,-1],[-1,-1],[-1,-1]]
-            else:
-                return [-1,-1,-1,-1,-1,]
-        boxes_zeus21 = maps.T21_bubbles(coef_21,PS21,z,Lbox,Nbox,seed,corr_21,CosmoParams,AstroParams,ClassyCosmo,BMF_use)
+
+        boxes_zeus21 = maps.T21_bubbles(coef_21,PS21,z,Lbox,Nbox,seed,corr_21,CosmoParams,AstroParams,BMF_use)
 
         # boxes of density, ionization, 21cm
         delta_box = boxes_zeus21.deltamap
         xHI_box = boxes_zeus21.xHI_map
         T21_box = boxes_zeus21.T21map
 
-        # 3) compute oLIMpus quantities
-        corr_LIM = Correlations_LIM(LineParams, CosmoParams, ClassyCosmo)
-        coef_LIM = get_LIM_coefficients(CosmoParams,  AstroParams, HMFintclass, LineParams, zmin=ZMIN)
-        PSLIM = Power_Spectra_LIM(CosmoParams, AstroParams, LineParams, corr_LIM, coef_LIM, RSD_MODE = RSDMODE)
-
-        boxes_oLIMpus = CoevalBoxes_percell('full',coef_LIM,corr_LIM,PSLIM,coef_21,z,LineParams,AstroParams,HMFintclass,CosmoParams,Lbox,Nbox,seed)
+        boxes_oLIMpus = CoevalBoxes_percell('full',coef_LIM,corr_LIM,PSLIM,coef_21,z,LineParams1,AstroParams,HMFintclass,CosmoParams,Lbox,Nbox,seed)
 
         # boxes of SFRD and line intensity
         SFRD_box = boxes_oLIMpus.SFRD_box
         LIM_box = boxes_oLIMpus.Inu_box
 
-        if LineParams2_input:
-            corr_LIM2 = Correlations_LIM(LineParams2, CosmoParams, ClassyCosmo)
-            coef_LIM2 = get_LIM_coefficients(CosmoParams,  AstroParams, HMFintclass, LineParams2, zmin=ZMIN)
-            PSLIM2 = Power_Spectra_LIM(CosmoParams, AstroParams, LineParams2, corr_LIM2, coef_LIM2, RSD_MODE = RSDMODE)
+        if LineParams2:
+            # corr_LIM2 = Correlations_LIM(LineParams2, CosmoParams, ClassyCosmo)
+            # coef_LIM2 = get_LIM_coefficients(CosmoParams,  AstroParams, HMFintclass, LineParams2, zmin=ZMIN)
+            # PSLIM2 = Power_Spectra_LIM(CosmoParams, AstroParams, LineParams2, corr_LIM2, coef_LIM2, RSD_MODE = RSDMODE)
 
             boxes_oLIMpus2 = CoevalBoxes_percell('full',coef_LIM2,corr_LIM2,PSLIM2,coef_21,z,LineParams2,AstroParams,HMFintclass,CosmoParams,Lbox,Nbox,seed)
 
@@ -336,7 +467,7 @@ def run_analysis(z,
         # 4) get 21cm and LIM slices
         slice_T21 = T21_box[islice]
         slice_LIM = LIM_box[islice]
-        if LineParams2_input:
+        if LineParams2:
             slice_LIM2 = LIM_box2[islice]
 
         xH_avg = np.mean(xHI_box)
@@ -345,12 +476,12 @@ def run_analysis(z,
         if store_quantities:
 
             with open(filename_all, 'wb') as handle:
-                if LineParams2_input:
+                if LineParams2:
                     pickle.dump({'delta': delta_box[islice], 'T21': slice_T21, 'SFRD': SFRD_box[islice], \
-                    'xHI': xHI_box[islice], LineParams.LINE: slice_LIM, LineParams2.LINE: slice_LIM2}, handle)
+                    'xHI': xHI_box[islice], LineParams1.LINE: slice_LIM, LineParams2.LINE: slice_LIM2}, handle)
                 else:
                     pickle.dump({'delta': delta_box[islice], 'T21': slice_T21, 'SFRD': SFRD_box[islice], \
-                    'xHI': xHI_box[islice], LineParams.LINE: slice_LIM}, handle)
+                    'xHI': xHI_box[islice], LineParams1.LINE: slice_LIM}, handle)
 
             if not os.path.exists(filename_xH):
                 with open(filename_xH, 'w') as f:
@@ -361,9 +492,9 @@ def run_analysis(z,
 
     # 6) compute correlations
     Pear = Pearson(slice_LIM, slice_T21, foregrounds)
-    k, ratio_cross = ratio_pk(LIM_box, T21_box, Lbox, Nbox, LineParams.LINE, foregrounds, store_quantities, folder, include_label)
-    squared_cross_val = squared_cross(LIM_box, T21_box, Lbox, Nbox, LineParams.LINE, store_quantities, folder, include_label)
-    if LineParams2_input:
+    k, ratio_cross = ratio_pk(LIM_box, T21_box, Lbox, Nbox, LineParams1.LINE, foregrounds, store_quantities, folder, include_label)
+    squared_cross_val = squared_cross(LIM_box, T21_box, Lbox, Nbox, LineParams1.LINE, store_quantities, folder, include_label)
+    if LineParams2:
         Pear2 = Pearson(slice_LIM2, slice_T21, foregrounds)
         k2, ratio_cross2 = ratio_pk(LIM_box2, T21_box, Lbox, Nbox, LineParams2.LINE, foregrounds, store_quantities, folder, include_label)
         squared_cross_val2 = squared_cross(LIM_box2, T21_box, Lbox, Nbox, LineParams2.LINE, store_quantities, folder, include_label)
